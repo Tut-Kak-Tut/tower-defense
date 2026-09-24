@@ -22,6 +22,7 @@ class Enemy {
     this.progress = 0;    // пройдена відстань — вежі цілять у найдальшого
     this.slowFactor = 1;
     this.slowTimer = 0;
+    this.dir = 0;
     this.dead = false;
     this.escaped = false;
   }
@@ -36,6 +37,7 @@ class Enemy {
       const t = PATH_PX[this.wp];
       const dx = t.x - this.x, dy = t.y - this.y;
       const d = Math.hypot(dx, dy);
+      this.dir = Math.atan2(dy, dx); // лише для малювання — куди дивиться
       if (d <= move) {
         this.x = t.x; this.y = t.y;
         move -= d; this.progress += d; this.wp++;
@@ -58,13 +60,29 @@ class Enemy {
   }
 
   draw(ctx) {
+    const r = this.radius;
     ctx.beginPath();
-    ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
-    ctx.fillStyle = this.color;
+    ctx.ellipse(this.x, this.y + r * 0.6, r, r * 0.45, 0, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(0,0,0,0.4)';
     ctx.fill();
-    ctx.lineWidth = this.slowTimer > 0 ? 3 : 2;
-    ctx.strokeStyle = this.slowTimer > 0 ? '#caf0f8' : 'rgba(0,0,0,0.5)';
-    ctx.stroke();
+
+    // фігурка зверху, повернута за напрямком руху (вперед = +x)
+    ctx.save();
+    ctx.translate(this.x, this.y);
+    ctx.rotate(this.dir);
+    drawAdventurer(ctx, this.type, r, this.color);
+    ctx.restore();
+
+    if (this.slowTimer > 0) {
+      // іній від привида
+      ctx.beginPath();
+      ctx.arc(this.x, this.y, r + 2, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(143, 227, 255, 0.3)';
+      ctx.fill();
+      ctx.strokeStyle = '#caf0f8';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+    }
 
     // смужка HP
     const w = 24, h = 4;
@@ -144,6 +162,58 @@ class Tower {
       ctx.moveTo(rx, ry - 3); ctx.lineTo(rx + 2.5, ry); ctx.lineTo(rx, ry + 3); ctx.lineTo(rx - 2.5, ry);
       ctx.fill();
     }
+    ctx.restore();
+  }
+}
+
+// ---------- малюнок авантюриста (центр у 0,0; дивиться вздовж +x) ----------
+
+function drawAdventurer(ctx, type, r, color) {
+  // зброя в правій руці (права = +y при погляді вздовж +x)
+  if (type === 'fast') {
+    ctx.fillStyle = '#cfd6de';
+    ctx.fillRect(r * 0.2, r * 0.55, r * 0.9, 2);             // кинджал
+  } else {
+    ctx.fillStyle = '#dfe4ea';
+    ctx.fillRect(r * 0.1, r * 0.6 - 1.5, r * 1.2, 3);        // меч
+    ctx.fillStyle = '#6b4a2b';
+    ctx.fillRect(r * 0.05, r * 0.6 - 3, 2, 6);               // гарда
+  }
+  // плечі / тулуб
+  ctx.beginPath();
+  ctx.ellipse(0, 0, r * 0.6, r, 0, 0, Math.PI * 2);
+  ctx.fillStyle = color;
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(0,0,0,0.55)';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+  // голова
+  ctx.beginPath();
+  ctx.arc(r * 0.1, 0, r * 0.45, 0, Math.PI * 2);
+  if (type === 'fast') {
+    ctx.fillStyle = '#2e4a2b';                                // каптур
+    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(-r * 0.2, -r * 0.35); ctx.lineTo(-r * 0.75, 0); ctx.lineTo(-r * 0.2, r * 0.35);
+    ctx.fill();
+  } else {
+    ctx.fillStyle = type === 'tank' ? '#f2d98a' : '#8e98a6'; // шолом
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = 'rgba(0,0,0,0.6)';
+    ctx.fillRect(r * 0.3, -r * 0.3, 1.5, r * 0.6);            // прорізь забрала
+  }
+  // щит паладина зліва-спереду
+  if (type === 'tank') {
+    ctx.save();
+    ctx.translate(r * 0.55, -r * 0.7);
+    ctx.fillStyle = '#2f5aa8';
+    ctx.strokeStyle = '#e6c35c';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, 3, r * 0.55, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
     ctx.restore();
   }
 }
@@ -274,6 +344,8 @@ class Projectile {
     this.slow = tower.def.slow || 0;
     this.slowTime = tower.def.slowTime || 0;
     this.color = tower.def.color;
+    this.kind = tower.type;
+    this.angle = tower.angle;
     this.done = false;
   }
 
@@ -293,6 +365,7 @@ class Projectile {
     } else {
       this.x += dx / d * step;
       this.y += dy / d * step;
+      this.angle = Math.atan2(dy, dx);
     }
   }
 
@@ -314,9 +387,36 @@ class Projectile {
   }
 
   draw(ctx) {
-    ctx.beginPath();
-    ctx.arc(this.x, this.y, this.splash ? 5 : 3, 0, Math.PI * 2);
-    ctx.fillStyle = this.color;
-    ctx.fill();
+    ctx.save();
+    ctx.translate(this.x, this.y);
+    if (this.kind === 'archer') {
+      // стріла: древко + наконечник + оперення
+      ctx.rotate(this.angle);
+      ctx.strokeStyle = '#c8b58e';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(-10, 0); ctx.lineTo(2, 0);
+      ctx.stroke();
+      ctx.fillStyle = '#9aa3ad';
+      ctx.beginPath();
+      ctx.moveTo(5, 0); ctx.lineTo(1, -2.5); ctx.lineTo(1, 2.5);
+      ctx.fill();
+      ctx.fillStyle = '#8b1e3f';
+      ctx.fillRect(-10, -2, 3, 4);
+    } else {
+      // фаєрбол імпа або крижана куля привида — з сяйвом
+      const fire = this.kind === 'cannon';
+      ctx.shadowColor = this.color;
+      ctx.shadowBlur = fire ? 14 : 10;
+      const rad = fire ? 5.5 : 4;
+      const grad = ctx.createRadialGradient(0, 0, 0, 0, 0, rad);
+      grad.addColorStop(0, fire ? '#fff3b0' : '#ffffff');
+      grad.addColorStop(1, this.color);
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(0, 0, rad, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
   }
 }
