@@ -19,7 +19,10 @@ const START_LIVES = 20;       // міцність Серця
 const WAVE_BONUS = 20;        // бонус за пройдену хвилю (+5 за кожен номер хвилі)
 const HP_GROWTH = 0.18;       // +18% HP ворогів за кожну наступну хвилю
 
-const MAX_LEVEL = 3;
+const MAX_LEVEL = 10;
+const LVL_DMG = 1.3;          // урон ×1.3 за кожен рівень
+const LVL_RANGE = 0.15;       // +0.15 клітинки дальності за рівень
+const LVL_RATE = 0.96;        // пауза між атаками ×0.96 за рівень (на 4% частіше)
 const UPGRADE_COST_MUL = 0.8; // ціна апгрейду = cost * 0.8 * поточний рівень
 const SELL_REFUND = 0.6;      // при продажу повертається 60% витраченого
 
@@ -44,9 +47,12 @@ const TOWERS = {
 
 // Авантюристи. speed — пікселів за секунду
 const ENEMIES = {
-  normal: { name: 'Воїн',    color: '#b0b8c4', hp: 40,  speed: 60,  reward: 5,  radius: 10 },
-  fast:   { name: 'Злодій',  color: '#4f7a4a', hp: 22,  speed: 110, reward: 5,  radius: 8 },
-  tank:   { name: 'Паладин', color: '#e6c35c', hp: 160, speed: 35,  reward: 15, radius: 14 },
+  normal: { name: 'Воїн',    color: '#b0b8c4', hp: 40,  speed: 60,  reward: 5,  radius: 10,
+            desc: 'Надійний шукач пригод, середній у всьому' },
+  fast:   { name: 'Злодій',  color: '#4f7a4a', hp: 22,  speed: 110, reward: 5,  radius: 8,
+            desc: 'Швидкий, але крихкий' },
+  tank:   { name: 'Паладин', color: '#e6c35c', hp: 160, speed: 35,  reward: 15, radius: 14,
+            desc: 'Повільний і дуже міцний' },
 };
 
 // Кожна хвиля — список груп [тип, кількість, інтервал між ворогами в секундах].

@@ -4,6 +4,17 @@ function cellCenter(col, row) {
   return { x: col * CELL + CELL / 2, y: row * CELL + CELL / 2 };
 }
 
+// Характеристики монстра на заданому рівні — і для гри, і для підказки про посилення.
+// range — у клітинках, rate — секунд між атаками.
+function towerStats(def, level) {
+  const l = level - 1;
+  return {
+    damage: def.damage * Math.pow(LVL_DMG, l),
+    range: def.range + LVL_RANGE * l,
+    rate: def.rate * Math.pow(LVL_RATE, l),
+  };
+}
+
 const PATH_PX = PATH_POINTS.map(([c, r]) => cellCenter(c, r));
 
 class Enemy {
@@ -110,8 +121,8 @@ class Tower {
     this.angle = -Math.PI / 2;
   }
 
-  get damage() { return this.def.damage * Math.pow(1.5, this.level - 1); }
-  get range() { return (this.def.range + 0.4 * (this.level - 1)) * CELL; }
+  get damage() { return towerStats(this.def, this.level).damage; }
+  get range() { return towerStats(this.def, this.level).range * CELL; }
   get upgradeCost() {
     return this.level >= MAX_LEVEL ? null : Math.round(this.def.cost * UPGRADE_COST_MUL * this.level);
   }
@@ -129,7 +140,7 @@ class Tower {
     if (!target) return;
     this.angle = Math.atan2(target.y - this.y, target.x - this.x);
     game.projectiles.push(new Projectile(this, target));
-    this.cooldown = this.def.rate;
+    this.cooldown = towerStats(this.def, this.level).rate;
   }
 
   draw(ctx) {
@@ -151,13 +162,15 @@ class Tower {
     else drawGhost(ctx, this.angle);
     ctx.restore();
 
-    // рівень — руни, що світяться
+    // рівень — руни, що світяться: до 5 фіолетових, далі вони по одній стають золотими
+    const runes = Math.min(this.level, 5);
+    const gold = this.level - 5;
     ctx.save();
-    ctx.fillStyle = '#c9a0ff';
-    ctx.shadowColor = '#9b5cff';
     ctx.shadowBlur = 6;
-    for (let i = 0; i < this.level; i++) {
-      const rx = x + (i - (this.level - 1) / 2) * 8, ry = y + 17;
+    for (let i = 0; i < runes; i++) {
+      ctx.fillStyle = i < gold ? '#ffd86b' : '#c9a0ff';
+      ctx.shadowColor = i < gold ? '#ffae00' : '#9b5cff';
+      const rx = x + (i - (runes - 1) / 2) * 8, ry = y + 17;
       ctx.beginPath();
       ctx.moveTo(rx, ry - 3); ctx.lineTo(rx + 2.5, ry); ctx.lineTo(rx, ry + 3); ctx.lineTo(rx - 2.5, ry);
       ctx.fill();

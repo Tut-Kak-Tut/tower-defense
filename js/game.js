@@ -36,6 +36,7 @@ function newGame() {
     paused: false,
     heartFlash: 0,      // секунди червоного спалаху Серця після удару
     over: null,         // 'win' | 'lose'
+    seen: new Set(),    // типи авантюристів, що вже з'являлись — для бестіарію
   };
 }
 
@@ -96,6 +97,7 @@ function update(dt) {
     const hpMul = 1 + (game.wave - 1) * HP_GROWTH;
     while (game.spawnQueue.length && game.spawnTimer <= 0) {
       const s = game.spawnQueue.shift();
+      game.seen.add(s.type);
       game.enemies.push(new Enemy(s.type, hpMul));
       if (game.spawnQueue.length) game.spawnTimer += game.spawnQueue[0].delay;
     }
