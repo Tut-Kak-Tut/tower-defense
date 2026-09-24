@@ -18,31 +18,61 @@ function towerStats(def, level) {
 const PATH_PX = PATH_POINTS.map(([c, r]) => cellCenter(c, r));
 
 class Enemy {
-  constructor(type, hpMul) {
+  constructor(type, hpMul, rewardMul = 1) {
     const def = ENEMIES[type];
     this.type = type;
+    this.def = def;
     this.color = def.color;
     this.radius = def.radius;
     this.baseSpeed = def.speed;
-    this.reward = def.reward;
+    this.reward = Math.round(def.reward * rewardMul);
     this.maxHp = Math.round(def.hp * hpMul);
     this.hp = this.maxHp;
+    // броня росте повільніше за HP, інакше на пізніх набігах вона обнуляла б слабких монстрів
+    this.armor = (def.armor || 0) * (1 + (hpMul - 1) * 0.5);
+    this.maxShield = Math.round(this.maxHp * (def.shield || 0));
+    this.shield = this.maxShield;
+    this.lifeDmg = def.lifeDmg || 1;
+    this.stealth = !!def.stealth;
+    this.healTimer = def.heal ? def.heal.every : 0;
     this.x = PATH_PX[0].x;
     this.y = PATH_PX[0].y;
     this.wp = 1;          // індекс наступної точки шляху
     this.progress = 0;    // пройдена відстань — вежі цілять у найдальшого
     this.slowFactor = 1;
     this.slowTimer = 0;
+    this.stunTimer = 0;
+    this.poisonDps = 0;
+    this.poisonTimer = 0;
     this.dir = 0;
     this.dead = false;
     this.escaped = false;
   }
 
-  update(dt) {
+  update(dt, game) {
     if (this.slowTimer > 0) {
       this.slowTimer -= dt;
       if (this.slowTimer <= 0) this.slowFactor = 1;
     }
+    if (this.poisonTimer > 0) {
+      this.poisonTimer -= dt;
+      this.hit(this.poisonDps * dt, true);
+      if (this.poisonTimer <= 0) this.poisonDps = 0;
+    }
+    if (this.def.heal) {
+      this.healTimer -= dt;
+      if (this.healTimer <= 0) {
+        const h = this.def.heal;
+        this.healTimer += h.every;
+        const rad = h.radius * CELL;
+        for (const e of game.enemies) {
+          if (e.dead || e.escaped || Math.hypot(e.x - this.x, e.y - this.y) > rad) continue;
+          e.hp = Math.min(e.maxHp, e.hp + e.maxHp * h.amount);
+        }
+        game.effects.push({ kind: 'heal', x: this.x, y: this.y, r: rad, t: 0.5, max: 0.5, color: '#9dffb0' });
+      }
+    }
+    if (this.stunTimer > 0) { this.stunTimer -= dt; return; }
     let move = this.baseSpeed * this.slowFactor * dt;
     while (move > 0 && this.wp < PATH_PX.length) {
       const t = PATH_PX[this.wp];
@@ -60,14 +90,33 @@ class Enemy {
     if (this.wp >= PATH_PX.length) this.escaped = true;
   }
 
-  hit(damage) {
+  // pierce — урон крізь броню (отрута)
+  hit(damage, pierce = false) {
+    if (this.dead) return;
+    if (!pierce && this.armor) damage = Math.max(damage * 0.2, damage - this.armor);
+    if (this.shield > 0) {
+      const absorbed = Math.min(this.shield, damage);
+      this.shield -= absorbed;
+      damage -= absorbed;
+    }
     this.hp -= damage;
     if (this.hp <= 0) this.dead = true;
   }
 
   slow(factor, time) {
+    if (this.def.slowImmune) return;
     this.slowFactor = Math.min(this.slowFactor, factor);
     this.slowTimer = Math.max(this.slowTimer, time);
+  }
+
+  stun(time) {
+    // боса оглушення тримає вдвічі коротше
+    this.stunTimer = Math.max(this.stunTimer, this.def.boss ? time / 2 : time);
+  }
+
+  poison(dps, time) {
+    this.poisonDps = Math.max(this.poisonDps, dps);
+    this.poisonTimer = Math.max(this.poisonTimer, time);
   }
 
   draw(ctx) {
@@ -77,12 +126,44 @@ class Enemy {
     ctx.fillStyle = 'rgba(0,0,0,0.4)';
     ctx.fill();
 
-    // фігурка зверху, повернута за напрямком руху (вперед = +x)
+    // фігурка зверху, повернута за напрямком руху (вперед = +x); невидимий ледь мерехтить
     ctx.save();
+    if (this.stealth) ctx.globalAlpha = 0.28 + Math.sin(time * 6 + this.progress * 0.05) * 0.08;
     ctx.translate(this.x, this.y);
     ctx.rotate(this.dir);
     drawAdventurer(ctx, this.type, r, this.color);
     ctx.restore();
+
+    if (this.shield > 0) {
+      // магічний щит — мерехтлива синя сфера
+      ctx.beginPath();
+      ctx.arc(this.x, this.y, r + 4, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(90, 140, 255, 0.12)';
+      ctx.fill();
+      ctx.strokeStyle = `rgba(140, 180, 255, ${0.5 + Math.sin(time * 5) * 0.2})`;
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+    }
+
+    if (this.poisonTimer > 0) {
+      // отрута — зелені бульбашки над головою
+      ctx.fillStyle = 'rgba(120, 230, 80, 0.8)';
+      for (let i = 0; i < 3; i++) {
+        const ph = (time * 1.5 + i / 3) % 1;
+        ctx.beginPath();
+        ctx.arc(this.x + (i - 1) * 5, this.y - ph * r * 1.2, 1.5 + (1 - ph), 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    if (this.stunTimer > 0) {
+      // оглушення — зірочки навколо голови
+      ctx.fillStyle = '#ffe066';
+      for (let i = 0; i < 3; i++) {
+        const a = time * 6 + i * Math.PI * 2 / 3;
+        ctx.fillRect(this.x + Math.cos(a) * r * 0.9 - 1.5, this.y - r * 0.4 + Math.sin(a) * r * 0.35 - 1.5, 3, 3);
+      }
+    }
 
     if (this.slowTimer > 0) {
       // іній від привида
@@ -95,14 +176,18 @@ class Enemy {
       ctx.stroke();
     }
 
-    // смужка HP
-    const w = 24, h = 4;
+    // смужка HP (у боса ширша), над нею — щит
+    const w = this.def.boss ? 44 : 24, h = this.def.boss ? 5 : 4;
     const x = this.x - w / 2, y = this.y - this.radius - 8;
     const frac = Math.max(0, this.hp / this.maxHp);
     ctx.fillStyle = '#222';
     ctx.fillRect(x, y, w, h);
     ctx.fillStyle = frac > 0.5 ? '#6ede8a' : frac > 0.25 ? '#ffd166' : '#ef476f';
     ctx.fillRect(x, y, w * frac, h);
+    if (this.shield > 0) {
+      ctx.fillStyle = '#7fa8ff';
+      ctx.fillRect(x, y - 3, w * this.shield / this.maxShield, 2);
+    }
   }
 }
 
@@ -133,7 +218,7 @@ class Tower {
     if (this.cooldown > 0) return;
     let target = null;
     for (const e of game.enemies) {
-      if (e.dead || e.escaped) continue;
+      if (e.dead || e.escaped || (e.stealth && !this.def.detect)) continue;
       if (Math.hypot(e.x - this.x, e.y - this.y) > this.range + e.radius) continue;
       if (!target || e.progress > target.progress) target = e;
     }
@@ -182,52 +267,188 @@ class Tower {
 // ---------- малюнок авантюриста (центр у 0,0; дивиться вздовж +x) ----------
 
 function drawAdventurer(ctx, type, r, color) {
-  // зброя в правій руці (права = +y при погляді вздовж +x)
-  if (type === 'fast') {
-    ctx.fillStyle = '#cfd6de';
-    ctx.fillRect(r * 0.2, r * 0.55, r * 0.9, 2);             // кинджал
-  } else {
+  const outline = () => { ctx.strokeStyle = 'rgba(0,0,0,0.55)'; ctx.lineWidth = 1.5; ctx.stroke(); };
+  const ellipse = (x, y, rx, ry, fill, stroke = true) => {
+    ctx.beginPath();
+    ctx.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2);
+    ctx.fillStyle = fill;
+    ctx.fill();
+    if (stroke) outline();
+  };
+  const sword = (len = 1.2, w = 3) => {
     ctx.fillStyle = '#dfe4ea';
-    ctx.fillRect(r * 0.1, r * 0.6 - 1.5, r * 1.2, 3);        // меч
+    ctx.fillRect(r * 0.1, r * 0.6 - w / 2, r * len, w);      // клинок
     ctx.fillStyle = '#6b4a2b';
     ctx.fillRect(r * 0.05, r * 0.6 - 3, 2, 6);               // гарда
-  }
-  // плечі / тулуб
-  ctx.beginPath();
-  ctx.ellipse(0, 0, r * 0.6, r, 0, 0, Math.PI * 2);
-  ctx.fillStyle = color;
-  ctx.fill();
-  ctx.strokeStyle = 'rgba(0,0,0,0.55)';
-  ctx.lineWidth = 1.5;
-  ctx.stroke();
-  // голова
-  ctx.beginPath();
-  ctx.arc(r * 0.1, 0, r * 0.45, 0, Math.PI * 2);
-  if (type === 'fast') {
-    ctx.fillStyle = '#2e4a2b';                                // каптур
+  };
+  const staff = (orb, glow) => {
+    ctx.fillStyle = '#6b4a2b';
+    ctx.fillRect(-r * 0.4, r * 0.6 - 1, r * 1.7, 2);
+    ctx.save();
+    ctx.shadowColor = glow;
+    ctx.shadowBlur = 8;
+    ctx.beginPath();
+    ctx.arc(r * 1.3, r * 0.6, 2.6, 0, Math.PI * 2);
+    ctx.fillStyle = orb;
     ctx.fill();
+    ctx.restore();
+  };
+  const body = () => ellipse(0, 0, r * 0.6, r, color);
+  const helmet = fill => {
+    ellipse(r * 0.1, 0, r * 0.45, r * 0.45, fill);
+    ctx.fillStyle = 'rgba(0,0,0,0.6)';
+    ctx.fillRect(r * 0.3, -r * 0.3, 1.5, r * 0.6);            // прорізь забрала
+  };
+  const hood = fill => {
+    ellipse(r * 0.1, 0, r * 0.45, r * 0.45, fill, false);
     ctx.beginPath();
     ctx.moveTo(-r * 0.2, -r * 0.35); ctx.lineTo(-r * 0.75, 0); ctx.lineTo(-r * 0.2, r * 0.35);
     ctx.fill();
-  } else {
-    ctx.fillStyle = type === 'tank' ? '#f2d98a' : '#8e98a6'; // шолом
-    ctx.fill();
-    ctx.stroke();
-    ctx.fillStyle = 'rgba(0,0,0,0.6)';
-    ctx.fillRect(r * 0.3, -r * 0.3, 1.5, r * 0.6);            // прорізь забрала
-  }
-  // щит паладина зліва-спереду
-  if (type === 'tank') {
-    ctx.save();
-    ctx.translate(r * 0.55, -r * 0.7);
-    ctx.fillStyle = '#2f5aa8';
-    ctx.strokeStyle = '#e6c35c';
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.ellipse(0, 0, 3, r * 0.55, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
-    ctx.restore();
+  };
+
+  switch (type) {
+    case 'fast':
+      ctx.fillStyle = '#cfd6de';
+      ctx.fillRect(r * 0.2, r * 0.55, r * 0.9, 2);             // кинджал
+      body();
+      hood('#2e4a2b');
+      break;
+
+    case 'tank':
+      sword();
+      body();
+      helmet('#f2d98a');
+      ctx.save();                                              // щит паладина зліва-спереду
+      ctx.translate(r * 0.55, -r * 0.7);
+      ctx.fillStyle = '#2f5aa8';
+      ctx.strokeStyle = '#e6c35c';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.ellipse(0, 0, 3, r * 0.55, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+      break;
+
+    case 'gnome': {
+      // сокира: руків'я + лезо-півмісяць
+      ctx.fillStyle = '#6b4a2b';
+      ctx.fillRect(-r * 0.1, r * 0.65 - 1, r * 1.2, 2);
+      ctx.beginPath();
+      ctx.arc(r * 1.0, r * 0.65, r * 0.4, -Math.PI / 2, Math.PI / 2);
+      ctx.fillStyle = '#c4ccd4';
+      ctx.fill();
+      ellipse(0, 0, r * 0.7, r * 0.85, color);                // кремезний у латах
+      ctx.strokeStyle = 'rgba(255,255,255,0.25)';              // пластини лат
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(-r * 0.35, -r * 0.6); ctx.lineTo(-r * 0.35, r * 0.6);
+      ctx.moveTo(-r * 0.05, -r * 0.75); ctx.lineTo(-r * 0.05, r * 0.75);
+      ctx.stroke();
+      ctx.beginPath();                                         // руда борода вперед
+      ctx.moveTo(r * 0.3, -r * 0.3); ctx.lineTo(r * 0.85, 0); ctx.lineTo(r * 0.3, r * 0.3);
+      ctx.fillStyle = '#c0562a';
+      ctx.fill();
+      helmet('#8e98a6');
+      break;
+    }
+
+    case 'priest':
+      staff('#fff2a8', '#ffe066');
+      body();
+      ellipse(r * 0.1, 0, r * 0.42, r * 0.42, '#f4efe6');       // мітра зверху
+      ctx.strokeStyle = '#d4a82a';                              // золотий хрест
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(r * 0.1 - r * 0.25, 0); ctx.lineTo(r * 0.1 + r * 0.25, 0);
+      ctx.moveTo(r * 0.1, -r * 0.25); ctx.lineTo(r * 0.1, r * 0.25);
+      ctx.stroke();
+      break;
+
+    case 'mage':
+      staff('#c78cff', '#a15cff');
+      body();
+      ellipse(r * 0.05, 0, r * 0.75, r * 0.75, '#3a2870');     // широкі криси капелюха
+      ellipse(r * 0.1, 0, r * 0.32, r * 0.32, '#4d3595', false);
+      ctx.fillStyle = '#ffd86b';                                // зірка на верхівці
+      ctx.fillRect(r * 0.1 - 1, -1, 2, 2);
+      break;
+
+    case 'scout':
+      ctx.strokeStyle = '#8a6a3a';                              // лук спереду
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(r * 0.2, 0, r * 0.95, -1.0, 1.0);
+      ctx.stroke();
+      ctx.strokeStyle = 'rgba(230,230,230,0.6)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(r * 0.2 + r * 0.95 * Math.cos(1), -r * 0.95 * Math.sin(1));
+      ctx.lineTo(r * 0.2 + r * 0.95 * Math.cos(1), r * 0.95 * Math.sin(1));
+      ctx.stroke();
+      ellipse(-r * 0.15, 0, r * 0.65, r * 1.05, '#24453a', false); // плащ
+      body();
+      hood('#2f5a48');
+      break;
+
+    case 'knight': {
+      // кінь: тулуб, шия з головою вперед, хвіст
+      ctx.fillStyle = '#3a2618';
+      ctx.fillRect(-r * 1.3, -1.5, r * 0.3, 3);
+      ellipse(0, 0, r * 1.05, r * 0.55, '#6b4528');
+      ellipse(r * 1.05, 0, r * 0.35, r * 0.22, '#5a3a22');
+      // спис уздовж правого боку, вістрям далеко вперед
+      ctx.fillStyle = '#8a6a3a';
+      ctx.fillRect(-r * 0.5, r * 0.45 - 1, r * 1.9, 2);
+      ctx.fillStyle = '#dfe4ea';
+      ctx.beginPath();
+      ctx.moveTo(r * 1.6, r * 0.45); ctx.lineTo(r * 1.35, r * 0.45 - 2.5); ctx.lineTo(r * 1.35, r * 0.45 + 2.5);
+      ctx.fill();
+      // вершник
+      ellipse(-r * 0.1, 0, r * 0.35, r * 0.6, color);
+      helmet('#c4ccd4');
+      ctx.fillStyle = '#b22a3a';                                // плюмаж
+      ctx.fillRect(-r * 0.3, -1.5, r * 0.4, 3);
+      break;
+    }
+
+    case 'hero': {
+      // червоний плащ позаду
+      ctx.beginPath();
+      ctx.moveTo(r * 0.1, -r * 0.8);
+      ctx.quadraticCurveTo(-r * 1.3, -r * 1.0 + Math.sin(time * 4) * 2, -r * 1.15, 0);
+      ctx.quadraticCurveTo(-r * 1.3, r * 1.0 + Math.sin(time * 4 + 1) * 2, r * 0.1, r * 0.8);
+      ctx.fillStyle = '#8b1e3f';
+      ctx.fill();
+      sword(1.5, 4);                                            // великий меч
+      body();
+      ctx.strokeStyle = '#fff1b8';                              // гравіювання на латах
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.arc(0, 0, r * 0.4, -Math.PI / 2, Math.PI / 2);
+      ctx.stroke();
+      ellipse(r * 0.1, 0, r * 0.42, r * 0.42, '#f0d8a8');        // голова
+      ctx.save();                                               // корона
+      ctx.translate(r * 0.1, 0);
+      ctx.fillStyle = '#ffd23f';
+      ctx.shadowColor = '#ffae00';
+      ctx.shadowBlur = 6;
+      ctx.beginPath();
+      for (let i = 0; i < 10; i++) {
+        const a = i / 10 * Math.PI * 2, rr = i % 2 ? r * 0.28 : r * 0.46;
+        ctx.lineTo(Math.cos(a) * rr, Math.sin(a) * rr);
+      }
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+      ellipse(r * 0.1, 0, r * 0.2, r * 0.2, '#f0d8a8', false);
+      break;
+    }
+
+    default: // 'normal' — воїн
+      sword();
+      body();
+      helmet('#8e98a6');
   }
 }
 

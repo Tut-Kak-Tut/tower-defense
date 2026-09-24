@@ -103,7 +103,7 @@ function update(dt) {
     }
   }
 
-  for (const e of game.enemies) e.update(dt);
+  for (const e of game.enemies) e.update(dt, game);
   for (const t of game.towers) t.update(dt, game);
   for (const p of game.projectiles) p.update(dt, game);
   for (const fx of game.effects) fx.t -= dt;
@@ -111,7 +111,7 @@ function update(dt) {
 
   game.enemies = game.enemies.filter(e => {
     if (e.dead) { game.money += e.reward; return false; }
-    if (e.escaped) { game.lives--; game.heartFlash = 0.5; return false; }
+    if (e.escaped) { game.lives -= e.lifeDmg; game.heartFlash = 0.5; return false; }
     return true;
   });
   game.projectiles = game.projectiles.filter(p => !p.done);

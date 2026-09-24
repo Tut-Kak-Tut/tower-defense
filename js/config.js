@@ -45,7 +45,15 @@ const TOWERS = {
   },
 };
 
-// Авантюристи. speed — пікселів за секунду
+// Авантюристи. speed — пікселів за секунду.
+// Необов'язкові механіки:
+//   armor      — віднімається від кожного удару (але лишається щонайменше 20% урону); отрута ігнорує броню
+//   shield     — частка maxHp, яку спершу поглинає магічний щит
+//   slowImmune — холод привида не діє
+//   heal       — лікує себе й сусідів: radius (кл.), amount (частка maxHp), every (с)
+//   stealth    — невидимий для монстрів без detect (вибухи по площі все одно зачіпають)
+//   lifeDmg    — скільки міцності Серця знімає при прориві (за замовчуванням 1)
+//   boss       — велика смужка HP
 const ENEMIES = {
   normal: { name: 'Воїн',    color: '#b0b8c4', hp: 40,  speed: 60,  reward: 5,  radius: 10,
             desc: 'Надійний шукач пригод, середній у всьому' },
@@ -53,6 +61,21 @@ const ENEMIES = {
             desc: 'Швидкий, але крихкий' },
   tank:   { name: 'Паладин', color: '#e6c35c', hp: 160, speed: 35,  reward: 15, radius: 14,
             desc: 'Повільний і дуже міцний' },
+  gnome:  { name: 'Гном-латник', color: '#7a6a5a', hp: 90, speed: 45, reward: 8, radius: 11, armor: 6,
+            desc: 'Важкі лати зрізають урон кожного удару — бий сильно або отрутою' },
+  priest: { name: 'Жрець',   color: '#e8e0d0', hp: 60,  speed: 50,  reward: 10, radius: 10,
+            heal: { radius: 1.5, amount: 0.06, every: 2 },
+            desc: 'Молитвою лікує себе й усіх поруч — убивай першим' },
+  mage:   { name: 'Бойовий маг', color: '#5a3fa0', hp: 55, speed: 55, reward: 10, radius: 10,
+            shield: 0.5, slowImmune: true,
+            desc: 'Магічний щит поглинає урон, холод на нього не діє' },
+  scout:  { name: 'Ельф-розвідник', color: '#3f6f5a', hp: 35, speed: 120, reward: 8, radius: 8, stealth: true,
+            desc: 'Невидимий: його бачать лише привид і око' },
+  knight: { name: 'Вершник', color: '#9aa4b0', hp: 180, speed: 85,  reward: 18, radius: 14, armor: 2, lifeDmg: 2,
+            desc: 'Швидкий і міцний, прорвавшись, б’є Серце вдвічі сильніше' },
+  hero:   { name: 'Герой',   color: '#d4a82a', hp: 1200, speed: 30, reward: 100, radius: 17,
+            armor: 4, shield: 0.25, lifeDmg: 5, boss: true,
+            desc: 'Легендарний бос: броня, щит, величезне здоров’я' },
 };
 
 // Кожна хвиля — список груп [тип, кількість, інтервал між ворогами в секундах].

@@ -32,7 +32,8 @@ function towerIcon(type, size = 32) {
 function enemyIcon(type, size = 32) {
   const def = ENEMIES[type];
   return makeIcon(size, g => {
-    const k = size * 0.36 / def.radius; // усі авантюристи однакового розміру в іконці
+    // усі авантюристи однакового розміру в іконці; вершник із конем і списом довший за радіус
+    const k = size * 0.36 / def.radius / (type === 'knight' ? 1.5 : 1);
     g.scale(k, k);
     g.rotate(-Math.PI / 2);
     drawAdventurer(g, type, def.radius, def.color);
@@ -197,6 +198,18 @@ function refreshRaid() {
 }
 
 // ---------- бестіарій ----------
+// Особливості авантюриста одним рядком: «броня 6 · щит 50% · …».
+function enemyTraits(def) {
+  const t = [];
+  if (def.armor) t.push(`броня ${def.armor}`);
+  if (def.shield) t.push(`щит ${Math.round(def.shield * 100)}%`);
+  if (def.slowImmune) t.push('не мерзне');
+  if (def.heal) t.push('лікує');
+  if (def.stealth) t.push('невидимий');
+  if (def.lifeDmg) t.push(`Серцю −${def.lifeDmg}`);
+  return t.length ? '. ' + t.join(' · ') : '';
+}
+
 function refreshBestiary() {
   for (const [type, r] of Object.entries(bestiary)) {
     const known = game.seen.has(type);
@@ -205,7 +218,7 @@ function refreshBestiary() {
     r.name.textContent = known ? def.name : '???';
     r.count.textContent = known ? `👻 ${def.reward}` : '';
     r.sub.textContent = known
-      ? `${def.desc}. Здоров'я ${def.hp}, швидкість ${def.speed}`
+      ? `${def.desc}. Здоров'я ${def.hp}, швидкість ${def.speed}${enemyTraits(def)}`
       : 'Ще не зустрічався в підземеллі';
   }
 }
