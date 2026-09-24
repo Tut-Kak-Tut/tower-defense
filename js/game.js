@@ -128,20 +128,124 @@ function update(dt) {
 
 // ---------- малювання ----------
 
-function drawMap() {
-  for (let r = 0; r < ROWS; r++) {
-    for (let c = 0; c < COLS; c++) {
-      if (PATH_CELLS.has(c + ',' + r)) ctx.fillStyle = '#c9b27c';
-      else ctx.fillStyle = (c + r) % 2 ? '#3f6b48' : '#44744e';
-      ctx.fillRect(c * CELL, r * CELL, CELL, CELL);
+// Детермінований "рандом" від координат — щоб візерунок каміння не змінювався між перемальовуваннями.
+function hash(a, b, seed = 0) {
+  let h = (a * 374761393 + b * 668265263 + seed * 2246822519) | 0;
+  h = Math.imul(h ^ (h >>> 13), 1274126177);
+  return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+}
+
+const isPath = (c, r) => PATH_CELLS.has(c + ',' + r);
+
+// Статичний шар мапи малюється один раз в offscreen-canvas, далі лише копіюється.
+function buildMapLayer() {
+  const layer = document.createElement('canvas');
+  layer.width = canvas.width;
+  layer.height = canvas.height;
+  const g = layer.getContext('2d');
+
+  // ніші: кам'яна кладка на всю мапу
+  g.fillStyle = '#131017';
+  g.fillRect(0, 0, layer.width, layer.height);
+  const BH = CELL / 2, BW = CELL;
+  for (let by = 0; by * BH < layer.height; by++) {
+    const off = by % 2 ? BW / 2 : 0;
+    for (let bx = -1; bx * BW < layer.width; bx++) {
+      const x = bx * BW + off, y = by * BH;
+      const n = hash(bx, by, 1);
+      const l = 10 + Math.floor(n * 6);
+      g.fillStyle = `hsl(270, 12%, ${l}%)`;
+      g.fillRect(x + 1, y + 1, BW - 2, BH - 2);
+      g.fillStyle = 'rgba(255,255,255,0.05)';
+      g.fillRect(x + 1, y + 1, BW - 2, 1);
+      g.fillStyle = 'rgba(0,0,0,0.35)';
+      g.fillRect(x + 1, y + BH - 2, BW - 2, 1);
+      // тріщина або мох на деяких цеглинах
+      const m = hash(bx, by, 2);
+      if (m < 0.12) {
+        g.strokeStyle = 'rgba(0,0,0,0.5)';
+        g.lineWidth = 1;
+        g.beginPath();
+        g.moveTo(x + 6 + m * 60, y + 2);
+        g.lineTo(x + 12 + m * 40, y + BH / 2);
+        g.lineTo(x + 8 + m * 80, y + BH - 3);
+        g.stroke();
+      } else if (m > 0.96) {
+        g.fillStyle = 'rgba(70, 110, 60, 0.3)';
+        g.beginPath();
+        g.ellipse(x + BW * hash(bx, by, 3), y + BH - 3, 7, 3, 0, 0, Math.PI * 2);
+        g.fill();
+      }
     }
   }
-  // вхід і вихід
-  const start = PATH_POINTS[0], end = PATH_POINTS[PATH_POINTS.length - 1];
-  ctx.fillStyle = '#2a9d8f';
-  ctx.fillRect(0, start[1] * CELL, 6, CELL);
-  ctx.fillStyle = '#e63946';
-  ctx.fillRect(COLS * CELL - 6, end[1] * CELL, 6, CELL);
+
+  // коридор: кам'яні плити
+  for (let r = 0; r < ROWS; r++) {
+    for (let c = 0; c < COLS; c++) {
+      if (!isPath(c, r)) continue;
+      const x = c * CELL, y = r * CELL;
+      const l = 27 + Math.floor(hash(c, r, 4) * 6);
+      g.fillStyle = `hsl(30, 8%, ${l}%)`;
+      g.fillRect(x, y, CELL, CELL);
+      // шви між плитами (кожна клітинка — 4 плитки)
+      g.strokeStyle = 'rgba(0,0,0,0.35)';
+      g.lineWidth = 1;
+      g.strokeRect(x + 0.5, y + 0.5, CELL - 1, CELL - 1);
+      g.beginPath();
+      g.moveTo(x + CELL / 2, y); g.lineTo(x + CELL / 2, y + CELL);
+      g.moveTo(x, y + CELL / 2); g.lineTo(x + CELL, y + CELL / 2);
+      g.stroke();
+      // камінці/плями
+      for (let i = 0; i < 3; i++) {
+        const k = hash(c, r, 10 + i);
+        g.fillStyle = k > 0.5 ? 'rgba(0,0,0,0.18)' : 'rgba(255,255,255,0.06)';
+        g.fillRect(x + hash(c, r, 20 + i) * (CELL - 4), y + hash(c, r, 30 + i) * (CELL - 4), 2 + k * 3, 2);
+      }
+    }
+  }
+
+  // тінь від стін на краях коридору
+  const SH = 9;
+  for (let r = 0; r < ROWS; r++) {
+    for (let c = 0; c < COLS; c++) {
+      if (!isPath(c, r)) continue;
+      const x = c * CELL, y = r * CELL;
+      const sides = [
+        [0, -1, x, y, x, y + SH, x, y, CELL, SH],
+        [0, 1, x, y + CELL, x, y + CELL - SH, x, y + CELL - SH, CELL, SH],
+        [-1, 0, x, y, x + SH, y, x, y, SH, CELL],
+        [1, 0, x + CELL, y, x + CELL - SH, y, x + CELL - SH, y, SH, CELL],
+      ];
+      for (const [dc, dr, x0, y0, x1, y1, rx, ry, rw, rh] of sides) {
+        if (isPath(c + dc, r + dr)) continue;
+        const grad = g.createLinearGradient(x0, y0, x1, y1);
+        grad.addColorStop(0, 'rgba(0,0,0,0.55)');
+        grad.addColorStop(1, 'rgba(0,0,0,0)');
+        g.fillStyle = grad;
+        g.fillRect(rx, ry, rw, rh);
+      }
+    }
+  }
+
+  // вхід у підземелля — кована ґрата зліва
+  const sy = PATH_POINTS[0][1] * CELL;
+  g.fillStyle = '#0a080c';
+  g.fillRect(0, sy + 2, 10, CELL - 4);
+  g.fillStyle = '#5a5060';
+  for (let i = 0; i < 4; i++) g.fillRect(1, sy + 6 + i * 8, 10, 2);
+  g.fillRect(3, sy + 2, 2, CELL - 4);
+  g.fillRect(8, sy + 2, 2, CELL - 4);
+  g.fillRect(0, sy, 12, 3);
+  g.fillRect(0, sy + CELL - 3, 12, 3);
+
+  return layer;
+}
+
+let mapLayer = null;
+
+function drawMap() {
+  if (!mapLayer) mapLayer = buildMapLayer();
+  ctx.drawImage(mapLayer, 0, 0);
 }
 
 function drawRange(x, y, range, ok) {
