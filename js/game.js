@@ -265,10 +265,13 @@ function draw() {
   if (ui.placing && ui.hover && inBounds(ui.hover.col, ui.hover.row)) {
     const { col, row } = ui.hover;
     const ok = canPlace(col, row) && game.money >= TOWERS[ui.placing].cost;
-    ctx.fillStyle = ok ? 'rgba(110,222,138,0.4)' : 'rgba(239,71,111,0.4)';
+    ctx.fillStyle = ok ? 'rgba(150,95,220,0.35)' : 'rgba(239,71,111,0.4)';
     ctx.fillRect(col * CELL, row * CELL, CELL, CELL);
     const c = cellCenter(col, row);
     drawRange(c.x, c.y, TOWERS[ui.placing].range * CELL, ok);
+    ctx.globalAlpha = 0.55;
+    new Tower(ui.placing, col, row).draw(ctx);
+    ctx.globalAlpha = 1;
   }
 
   if (ui.selected) drawRange(ui.selected.x, ui.selected.y, ui.selected.range, true);
@@ -297,10 +300,12 @@ function draw() {
 }
 
 let lastTime = performance.now();
+let time = 0; // секунди реального часу — для анімацій (факели, привид), не для логіки
 
 function frame(now) {
   const dt = Math.min((now - lastTime) / 1000, 0.05); // обмеження, щоб не "телепортувалось" після згортання вкладки
   lastTime = now;
+  time += dt;
   if (!game.paused) {
     for (let i = 0; i < game.speed && !game.over; i++) update(dt);
   }

@@ -115,29 +115,150 @@ class Tower {
   }
 
   draw(ctx) {
-    const s = CELL - 8;
-    ctx.fillStyle = '#2b2d42';
-    ctx.fillRect(this.x - s / 2, this.y - s / 2, s, s);
+    const { x, y } = this;
 
-    // ствол
+    // коло призову під монстром + тінь
+    ctx.beginPath();
+    ctx.ellipse(x, y + 12, 15, 6, 0, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(0,0,0,0.45)';
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(150, 95, 220, 0.55)';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
     ctx.save();
-    ctx.translate(this.x, this.y);
-    ctx.rotate(this.angle);
-    ctx.fillStyle = '#8d99ae';
-    ctx.fillRect(0, -3, 16, 6);
+    ctx.translate(x, y);
+    if (this.type === 'archer') drawSkeleton(ctx, this.angle);
+    else if (this.type === 'cannon') drawImp(ctx, this.angle);
+    else drawGhost(ctx, this.angle);
     ctx.restore();
 
-    ctx.beginPath();
-    ctx.arc(this.x, this.y, 10, 0, Math.PI * 2);
-    ctx.fillStyle = this.def.color;
-    ctx.fill();
-
-    // рівень — крапки внизу
-    ctx.fillStyle = '#ffd166';
+    // рівень — руни, що світяться
+    ctx.save();
+    ctx.fillStyle = '#c9a0ff';
+    ctx.shadowColor = '#9b5cff';
+    ctx.shadowBlur = 6;
     for (let i = 0; i < this.level; i++) {
-      ctx.fillRect(this.x - 10 + i * 8, this.y + s / 2 - 5, 5, 3);
+      const rx = x + (i - (this.level - 1) / 2) * 8, ry = y + 17;
+      ctx.beginPath();
+      ctx.moveTo(rx, ry - 3); ctx.lineTo(rx + 2.5, ry); ctx.lineTo(rx, ry + 3); ctx.lineTo(rx - 2.5, ry);
+      ctx.fill();
     }
+    ctx.restore();
   }
+}
+
+// ---------- малюнки монстрів (центр у 0,0; angle — напрямок на ціль) ----------
+
+function drawSkeleton(ctx, angle) {
+  const bone = TOWERS.archer.color;
+  // хребет і ребра
+  ctx.strokeStyle = bone;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(0, 0); ctx.lineTo(0, 11);
+  for (let i = 0; i < 3; i++) {
+    const w = 6 - i;
+    ctx.moveTo(-w, 3 + i * 3); ctx.lineTo(w, 3 + i * 3);
+  }
+  ctx.stroke();
+  // лук, повернутий до цілі
+  ctx.save();
+  ctx.rotate(angle);
+  ctx.strokeStyle = '#7a5230';
+  ctx.lineWidth = 2.5;
+  ctx.beginPath();
+  ctx.arc(4, 0, 12, -1.1, 1.1);
+  ctx.stroke();
+  ctx.strokeStyle = 'rgba(230,230,230,0.7)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  const bx = 4 + 12 * Math.cos(1.1), by = 12 * Math.sin(1.1);
+  ctx.moveTo(bx, -by); ctx.lineTo(bx, by);
+  ctx.stroke();
+  ctx.restore();
+  // череп
+  ctx.beginPath();
+  ctx.arc(0, -7, 7.5, 0, Math.PI * 2);
+  ctx.fillStyle = bone;
+  ctx.fill();
+  ctx.fillRect(-4, -2, 8, 4);
+  ctx.fillStyle = '#1a1014';
+  ctx.beginPath();
+  ctx.arc(-3, -7, 2.2, 0, Math.PI * 2);
+  ctx.arc(3, -7, 2.2, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#ff3b3b';
+  ctx.fillRect(-3.5, -7.5, 1, 1);
+  ctx.fillRect(2.5, -7.5, 1, 1);
+}
+
+function drawImp(ctx, angle) {
+  // крила
+  ctx.fillStyle = '#4a1414';
+  ctx.beginPath();
+  ctx.moveTo(-6, -2); ctx.lineTo(-17, -10); ctx.lineTo(-14, 2); ctx.closePath();
+  ctx.moveTo(6, -2); ctx.lineTo(17, -10); ctx.lineTo(14, 2); ctx.closePath();
+  ctx.fill();
+  // тіло
+  const grad = ctx.createRadialGradient(-3, -4, 2, 0, 0, 12);
+  grad.addColorStop(0, '#e8552a');
+  grad.addColorStop(1, '#8a1e10');
+  ctx.beginPath();
+  ctx.arc(0, 0, 10, 0, Math.PI * 2);
+  ctx.fillStyle = grad;
+  ctx.fill();
+  // роги
+  ctx.fillStyle = '#2a1a14';
+  ctx.beginPath();
+  ctx.moveTo(-7, -6); ctx.lineTo(-9, -15); ctx.lineTo(-3, -9); ctx.closePath();
+  ctx.moveTo(7, -6); ctx.lineTo(9, -15); ctx.lineTo(3, -9); ctx.closePath();
+  ctx.fill();
+  // очі
+  ctx.fillStyle = '#ffd23f';
+  ctx.beginPath();
+  ctx.ellipse(-3.5, -2, 2.2, 1.4, 0.3, 0, Math.PI * 2);
+  ctx.ellipse(3.5, -2, 2.2, 1.4, -0.3, 0, Math.PI * 2);
+  ctx.fill();
+  // вогонь у лапі в напрямку цілі
+  const fx = Math.cos(angle) * 12, fy = Math.sin(angle) * 12;
+  const flick = 3.5 + Math.sin(time * 12) * 0.8;
+  ctx.save();
+  ctx.shadowColor = '#ff7a2f';
+  ctx.shadowBlur = 10;
+  ctx.fillStyle = '#ffb347';
+  ctx.beginPath();
+  ctx.arc(fx, fy, flick, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawGhost(ctx, angle) {
+  const bob = Math.sin(time * 3) * 2;
+  ctx.save();
+  ctx.translate(0, bob - 2);
+  ctx.shadowColor = '#8fe3ff';
+  ctx.shadowBlur = 12;
+  ctx.fillStyle = 'rgba(190, 240, 255, 0.8)';
+  ctx.beginPath();
+  ctx.arc(0, -3, 10, Math.PI, 0);
+  ctx.lineTo(10, 10);
+  // хвилястий низ
+  for (let i = 0; i < 4; i++) {
+    const x0 = 10 - i * 5;
+    const wave = Math.sin(time * 5 + i) * 1.5;
+    ctx.quadraticCurveTo(x0 - 2.5, 6 + wave, x0 - 5, 10);
+  }
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+  // очі дивляться на ціль
+  const ex = Math.cos(angle) * 1.5, ey = Math.sin(angle) * 1.5;
+  ctx.fillStyle = '#1b2a44';
+  ctx.beginPath();
+  ctx.ellipse(-3.5 + ex, -3 + bob + ey, 2, 3, 0, 0, Math.PI * 2);
+  ctx.ellipse(3.5 + ex, -3 + bob + ey, 2, 3, 0, 0, Math.PI * 2);
+  ctx.fill();
 }
 
 class Projectile {
