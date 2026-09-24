@@ -34,6 +34,7 @@ function newGame() {
     effects: [],
     speed: 1,
     paused: false,
+    heartFlash: 0,      // секунди червоного спалаху Серця після удару
     over: null,         // 'win' | 'lose'
   };
 }
@@ -104,10 +105,11 @@ function update(dt) {
   for (const t of game.towers) t.update(dt, game);
   for (const p of game.projectiles) p.update(dt, game);
   for (const fx of game.effects) fx.t -= dt;
+  game.heartFlash = Math.max(0, game.heartFlash - dt);
 
   game.enemies = game.enemies.filter(e => {
     if (e.dead) { game.money += e.reward; return false; }
-    if (e.escaped) { game.lives--; return false; }
+    if (e.escaped) { game.lives--; game.heartFlash = 0.5; return false; }
     return true;
   });
   game.projectiles = game.projectiles.filter(p => !p.done);
@@ -248,6 +250,89 @@ function drawMap() {
   ctx.drawImage(mapLayer, 0, 0);
 }
 
+// Серце Підземелля — на останній клітинці коридору, пульсує; спалахує червоним при ударі.
+function drawHeart() {
+  const [ec, er] = PATH_POINTS[PATH_POINTS.length - 1];
+  const x = (ec - 1) * CELL + CELL / 2, y = er * CELL + CELL / 2;
+  const hurt = game.heartFlash / 0.5;
+  const beat = 1.35 + 0.12 * Math.max(0, Math.sin(time * 4)) ** 3 + hurt * 0.2;
+
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  const glow = ctx.createRadialGradient(x, y, 4, x, y, 70);
+  glow.addColorStop(0, hurt > 0 ? `rgba(255,60,60,${0.55 + hurt * 0.3})` : 'rgba(170,70,255,0.6)');
+  glow.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = glow;
+  ctx.fillRect(x - 70, y - 70, 140, 140);
+  ctx.restore();
+
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(beat, beat);
+  ctx.shadowColor = hurt > 0 ? '#ff3b3b' : '#b35cff';
+  ctx.shadowBlur = 25;
+  const body = ctx.createRadialGradient(-4, -5, 1, 0, 0, 16);
+  body.addColorStop(0, '#ffc2ea');
+  body.addColorStop(0.45, hurt > 0 ? '#ff2a48' : '#d43cb4');
+  body.addColorStop(1, '#5a0f48');
+  ctx.fillStyle = body;
+  ctx.beginPath();
+  ctx.moveTo(0, 13);
+  ctx.bezierCurveTo(-18, 2, -12, -14, 0, -6);
+  ctx.bezierCurveTo(12, -14, 18, 2, 0, 13);
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawTorches() {
+  for (const [c, r] of TORCHES) {
+    const x = c * CELL + CELL / 2, y = r * CELL + 10;
+    const f = Math.sin(time * 9 + c * 3) * 0.5 + Math.sin(time * 23 + r) * 0.5; // мерехтіння -1..1
+
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    const rad = 85 + f * 6;
+    const light = ctx.createRadialGradient(x, y, 2, x, y, rad);
+    light.addColorStop(0, 'rgba(255,150,60,0.32)');
+    light.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = light;
+    ctx.fillRect(x - rad, y - rad, rad * 2, rad * 2);
+    ctx.restore();
+
+    ctx.fillStyle = '#3a2a1c';                  // тримач
+    ctx.fillRect(x - 2, y, 4, 9);
+    ctx.fillStyle = '#1e1a22';
+    ctx.fillRect(x - 4, y - 1, 8, 3);
+    ctx.save();
+    ctx.shadowColor = '#ff8c2f';
+    ctx.shadowBlur = 12;
+    ctx.fillStyle = '#ff9a3c';
+    ctx.beginPath();                            // полум'я
+    ctx.moveTo(x - 4, y - 1);
+    ctx.quadraticCurveTo(x - 3 + f, y - 10 - f * 2, x + f * 1.5, y - 13 - f * 2);
+    ctx.quadraticCurveTo(x + 3 + f, y - 8, x + 4, y - 1);
+    ctx.fill();
+    ctx.fillStyle = '#ffe28a';
+    ctx.beginPath();
+    ctx.ellipse(x, y - 4, 1.8, 3.5, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+}
+
+let vignette = null;
+
+function drawVignette() {
+  if (!vignette) {
+    const w = canvas.width, h = canvas.height;
+    vignette = ctx.createRadialGradient(w / 2, h / 2, h * 0.35, w / 2, h / 2, w * 0.62);
+    vignette.addColorStop(0, 'rgba(0,0,0,0)');
+    vignette.addColorStop(1, 'rgba(0,0,0,0.7)');
+  }
+  ctx.fillStyle = vignette;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+}
+
 function drawRange(x, y, range, ok) {
   ctx.beginPath();
   ctx.arc(x, y, range, 0, Math.PI * 2);
@@ -260,6 +345,7 @@ function drawRange(x, y, range, ok) {
 
 function draw() {
   drawMap();
+  drawTorches();
 
   // привид вежі під курсором
   if (ui.placing && ui.hover && inBounds(ui.hover.col, ui.hover.row)) {
@@ -288,11 +374,14 @@ function draw() {
     ctx.globalAlpha = 1;
   }
 
+  drawVignette();
+  drawHeart(); // після віньєтки, щоб головна ціль не тонула в темряві кута
+
   if (game.paused && !game.over) {
     ctx.fillStyle = 'rgba(0,0,0,0.45)';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.fillStyle = '#fff';
-    ctx.font = 'bold 40px sans-serif';
+    ctx.fillStyle = '#d9c8a9';
+    ctx.font = 'bold 40px Cinzel, Georgia, serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText('ПАУЗА', canvas.width / 2, canvas.height / 2);
