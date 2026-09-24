@@ -3,16 +3,18 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Tower Defense</title>
+  <title>Серце Підземелля</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;800&display=swap">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <div id="app">
     <header id="hud">
-      <h1>Tower Defense</h1>
-      <div class="stat" title="Гроші">💰 <span id="money"></span></div>
-      <div class="stat" title="Життя">❤️ <span id="lives"></span></div>
-      <div class="stat" title="Хвиля">🌊 <span id="wave"></span></div>
+      <h1>Серце Підземелля</h1>
+      <div class="stat souls" title="Душі — платиш ними за монстрів">👻 <span id="money"></span></div>
+      <div class="stat heart" title="Міцність Серця">💜 <span id="lives"></span></div>
+      <div class="stat raid" title="Набіг">⚔️ <span id="wave"></span></div>
     </header>
 
     <main>
@@ -29,7 +31,7 @@
 
       <aside id="sidebar">
         <section>
-          <h3>Вежі</h3>
+          <h3>Монстри</h3>
           <div id="towerList"></div>
         </section>
 
@@ -49,10 +51,10 @@
         </section>
 
         <section class="help">
-          <b>Як грати:</b> вибери вежу і клацни по траві. Клік по вежі — покращити або продати.
-          Не пропусти ворогів до червоного виходу.<br>
-          <kbd>1</kbd>–<kbd>3</kbd> вежа · <kbd>Esc</kbd>/ПКМ скасувати ·
-          <kbd>Enter</kbd> хвиля · <kbd>Пробіл</kbd> пауза
+          <b>Ти — володар підземелля.</b> Вибери монстра і посели його в нішу біля коридору.
+          Клік по монстру — посилити або вигнати. Не дай авантюристам дістатися Серця.<br>
+          <kbd>1</kbd>–<kbd>3</kbd> монстр · <kbd>Esc</kbd>/ПКМ скасувати ·
+          <kbd>Enter</kbd> набіг · <kbd>Пробіл</kbd> пауза
         </section>
       </aside>
     </main>

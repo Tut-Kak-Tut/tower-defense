@@ -14,9 +14,9 @@ Object.entries(TOWERS).forEach(([type, def], i) => {
   const btn = document.createElement('button');
   btn.className = 'tower-btn';
   btn.innerHTML =
-    `<span class="swatch" style="background:${def.color}"></span>` +
+    `<span class="swatch" style="background:${def.color};color:${def.color}"></span>` +
     `<span class="t-name">${def.name} <kbd>${i + 1}</kbd></span>` +
-    `<span class="t-cost">💰 ${def.cost}</span>` +
+    `<span class="t-cost">👻 ${def.cost}</span>` +
     `<span class="t-desc">${def.desc}</span>`;
   btn.addEventListener('click', () => selectTowerType(type));
   $('towerList').appendChild(btn);
@@ -92,7 +92,7 @@ function refreshUI() {
 
   const waveBtn = $('waveBtn');
   waveBtn.disabled = game.waveActive || !!game.over;
-  waveBtn.textContent = game.waveActive ? 'Хвиля йде…' : `▶ Почати хвилю ${game.wave + 1}`;
+  waveBtn.textContent = game.waveActive ? '⚔️ Набіг триває…' : `⚔️ Впустити набіг ${game.wave + 1}`;
   $('speedBtn').textContent = game.speed === 1 ? '⏩ Швидкість x1' : '⏩ Швидкість x2';
   $('pauseBtn').textContent = game.paused ? '▶ Продовжити' : '⏸ Пауза';
 
@@ -107,18 +107,18 @@ function refreshUI() {
       up.textContent = 'Макс. рівень';
       up.disabled = true;
     } else {
-      up.textContent = `⬆ Покращити (💰 ${t.upgradeCost})`;
+      up.textContent = `⬆ Посилити (👻 ${t.upgradeCost})`;
       up.disabled = game.money < t.upgradeCost;
     }
-    $('sellBtn').textContent = `Продати (+💰 ${t.sellValue})`;
+    $('sellBtn').textContent = `Вигнати (+👻 ${t.sellValue})`;
   }
 
   $('overlay').classList.toggle('hidden', !game.over);
   if (game.over) {
-    $('overlayTitle').textContent = game.over === 'win' ? '🏆 Перемога!' : '💀 Поразка';
+    $('overlayTitle').textContent = game.over === 'win' ? '👑 Підземелля вистояло' : '💔 Серце зруйновано';
     $('overlayText').textContent = game.over === 'win'
-      ? `Усі ${WAVES.length} хвиль відбито. Залишилось життів: ${game.lives}.`
-      : `Вороги прорвались на хвилі ${game.wave}.`;
+      ? `Усі ${WAVES.length} набігів відбито. Міцність Серця: ${game.lives}.`
+      : `Авантюристи прорвались до Серця під час набігу ${game.wave}.`;
   }
 }
 

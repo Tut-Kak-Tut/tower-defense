@@ -4,15 +4,15 @@ const CELL = 40;   // розмір клітинки в пікселях
 const COLS = 20;
 const ROWS = 12;
 
-// Шлях ворогів: точки повороту в клітинках [col, row].
-// Перша і остання точки — за межами мапи (вхід і вихід).
+// Коридор авантюристів: точки повороту в клітинках [col, row].
+// Перша і остання точки — за межами мапи (вхід у підземелля і Серце).
 // Сегменти мають бути лише горизонтальними або вертикальними.
 const PATH_POINTS = [
   [-1, 2], [4, 2], [4, 8], [9, 8], [9, 3], [14, 3], [14, 9], [20, 9],
 ];
 
-const START_MONEY = 150;
-const START_LIVES = 20;
+const START_MONEY = 150;      // душі
+const START_LIVES = 20;       // міцність Серця
 const WAVE_BONUS = 20;        // бонус за пройдену хвилю (+5 за кожен номер хвилі)
 const HP_GROWTH = 0.18;       // +18% HP ворогів за кожну наступну хвилю
 
@@ -23,27 +23,27 @@ const SELL_REFUND = 0.6;      // при продажу повертається 
 // range і splash — у клітинках, rate — секунд між пострілами
 const TOWERS = {
   archer: {
-    name: 'Стрілець', color: '#4ea8de', cost: 50,
+    name: 'Скелет-лучник', color: '#e8dcc0', cost: 50,
     damage: 12, range: 3, rate: 0.5, projSpeed: 450,
-    desc: 'Швидко б\'є одну ціль',
+    desc: 'Часто стріляє в одного авантюриста',
   },
   cannon: {
-    name: 'Гармата', color: '#e76f51', cost: 100,
+    name: 'Вогняний імп', color: '#ff7a2f', cost: 100,
     damage: 35, range: 2.5, rate: 1.6, projSpeed: 300, splash: 1.2,
-    desc: 'Повільна, урон по площі',
+    desc: 'Повільний фаєрбол, вибух по площі',
   },
   frost: {
-    name: 'Мороз', color: '#90e0ef', cost: 75,
+    name: 'Привид', color: '#8fe3ff', cost: 75,
     damage: 4, range: 2.5, rate: 0.9, projSpeed: 400, slow: 0.5, slowTime: 2,
-    desc: 'Сповільнює ворогів на 50%',
+    desc: 'Крижаний дотик: сповільнює на 50%',
   },
 };
 
-// speed — пікселів за секунду
+// Авантюристи. speed — пікселів за секунду
 const ENEMIES = {
-  normal: { name: 'Звичайний', color: '#e9c46a', hp: 40,  speed: 60,  reward: 5,  radius: 10 },
-  fast:   { name: 'Швидкий',   color: '#f4a261', hp: 22,  speed: 110, reward: 5,  radius: 8 },
-  tank:   { name: 'Танк',      color: '#9d4edd', hp: 160, speed: 35,  reward: 15, radius: 14 },
+  normal: { name: 'Воїн',    color: '#b0b8c4', hp: 40,  speed: 60,  reward: 5,  radius: 10 },
+  fast:   { name: 'Злодій',  color: '#4f7a4a', hp: 22,  speed: 110, reward: 5,  radius: 8 },
+  tank:   { name: 'Паладин', color: '#e6c35c', hp: 160, speed: 35,  reward: 15, radius: 14 },
 };
 
 // Кожна хвиля — список груп [тип, кількість, інтервал між ворогами в секундах].
