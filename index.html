@@ -16,6 +16,7 @@
       <div class="stat heart" title="Міцність Серця">💜 <span id="lives"></span></div>
       <div class="stat raid" title="Набіг">⚔️ <span id="wave"></span></div>
       <button id="speedBtn" class="hud-btn" title="Швидкість гри"></button>
+      <button id="autoBtn" class="hud-btn" title="Авто-набіг: наступний почнеться сам (A)"></button>
       <button id="pauseBtn" class="hud-btn" title="Пауза (Пробіл)"></button>
     </header>
 
@@ -39,7 +40,13 @@
           <div class="panel">
             <h2 id="overlayTitle"></h2>
             <p id="overlayText"></p>
-            <button id="restartBtn" class="primary">Грати знову</button>
+            <div class="overlay-btns">
+              <button id="campaignBtn" class="primary">⚔️ Кампанія (100 набігів)</button>
+              <button id="endlessBtn" class="primary">♾️ Безкінечний</button>
+              <button id="continueBtn" class="primary">♾️ Продовжити безкінечно</button>
+              <button id="restartBtn" class="primary">Грати знову</button>
+              <button id="menuBtn">До меню</button>
+            </div>
           </div>
         </div>
       </div>
@@ -57,7 +64,7 @@
               <b>Ти — володар підземелля.</b> Вибери монстра і посели його в нішу біля коридору.
               Клік по монстру на полі — посилити або вигнати.<br>
               <kbd>1</kbd>–<kbd>7</kbd> монстр · <kbd>Esc</kbd>/ПКМ скасувати ·
-              <kbd>Enter</kbd> набіг · <kbd>Пробіл</kbd> пауза
+              <kbd>Enter</kbd> набіг · <kbd>A</kbd> авто · <kbd>Пробіл</kbd> пауза
             </p>
           </div>
 

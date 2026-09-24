@@ -127,13 +127,23 @@ canvas.addEventListener('click', e => {
 
 // ---------- кнопки керування ----------
 $('waveBtn').addEventListener('click', startWave);
-$('speedBtn').addEventListener('click', () => { game.speed = game.speed === 1 ? 2 : 1; });
+$('speedBtn').addEventListener('click', () => { game.speed = game.speed % 3 + 1; });
+$('autoBtn').addEventListener('click', toggleAuto);
 $('pauseBtn').addEventListener('click', () => { game.paused = !game.paused; });
 $('upgradeBtn').addEventListener('click', () => { if (ui.selected) upgradeTower(ui.selected); });
 $('sellBtn').addEventListener('click', () => {
   if (ui.selected) { sellTower(ui.selected); ui.selected = null; }
 });
-$('restartBtn').addEventListener('click', () => { newGame(); cancelSelection(); });
+$('restartBtn').addEventListener('click', () => { newGame(game.mode); cancelSelection(); });
+$('campaignBtn').addEventListener('click', () => { newGame('campaign'); cancelSelection(); });
+$('endlessBtn').addEventListener('click', () => { newGame('endless'); cancelSelection(); });
+$('continueBtn').addEventListener('click', continueEndless);
+$('menuBtn').addEventListener('click', () => { newGame(); cancelSelection(); });
+
+function toggleAuto() {
+  game.auto = !game.auto;
+  game.autoTimer = AUTO_DELAY;
+}
 
 // ---------- клавіатура ----------
 const towerTypes = Object.keys(TOWERS);
@@ -142,13 +152,14 @@ document.addEventListener('keydown', e => {
   else if (e.key === 'Escape') cancelSelection();
   else if (e.key === ' ') { e.preventDefault(); if (!game.over) game.paused = !game.paused; }
   else if (e.key === 'Enter') { e.preventDefault(); startWave(); }
+  else if (e.code === 'KeyA') toggleAuto(); // за кодом клавіші — працює і в українській розкладці
 });
 
 // ---------- панель набігу ----------
-// Склад набігу за типами: WAVES[i] може містити кілька груп одного типу.
+// Склад набігу за типами: набіг може містити кілька груп одного типу. index — з 0.
 function raidGroups(index) {
   const total = {};
-  for (const [type, count] of WAVES[index]) total[type] = (total[type] || 0) + count;
+  for (const [type, count] of waveGroups(index + 1)) total[type] = (total[type] || 0) + count;
   return total;
 }
 
@@ -164,7 +175,7 @@ function refreshRaid() {
     raidRows = {};
     const list = $('raidList');
     list.textContent = '';
-    if (index >= WAVES.length) {
+    if (index >= maxWaves()) {
       $('raidTitle').textContent = 'Набігів більше немає';
       list.innerHTML = '<p class="empty">Підземелля чекає в тиші.</p>';
     } else {
@@ -265,7 +276,7 @@ function refreshUpgrade() {
     if (def.chain) stat('Стрибків', s => s.chain);
     if (def.stun) stat('Оглушення', s => `${Math.round(s.stunChance * 100)}% · ${def.stun}с`);
     if (def.attack === 'beam') fixed('Промінь', 'крізь усіх');
-    if (def.detect) fixed('Бачить невидимих', 'так');
+    if (def.detect) fixed('Підсвічує невидимих', 'так');
 
     $('upStats').innerHTML = rows.map(([label, a, b]) => {
       if (maxed) return `<tr><td>${label}</td><td class="max" colspan="3">${a}</td></tr>`;
@@ -287,9 +298,10 @@ function refreshUpgrade() {
 
 // ---------- оновлення панелей (кожен кадр) ----------
 function refreshUI() {
+  const max = maxWaves();
   $('money').textContent = game.money;
   $('lives').textContent = game.lives;
-  $('wave').textContent = `${game.wave} / ${WAVES.length}`;
+  $('wave').textContent = `${game.wave} / ${max === Infinity ? '∞' : max}`;
 
   for (const [type, btn] of Object.entries(towerButtons)) {
     btn.classList.toggle('active', ui.placing === type);
@@ -307,20 +319,45 @@ function refreshUI() {
 
   const waveBtn = $('waveBtn');
   waveBtn.disabled = game.waveActive || !!game.over;
-  waveBtn.classList.toggle('hidden', game.wave >= WAVES.length && !game.waveActive);
-  waveBtn.textContent = game.waveActive ? '⚔️ Набіг триває…' : `⚔️ Впустити набіг ${game.wave + 1}`;
-  $('speedBtn').textContent = game.speed === 1 ? '⏩ x1' : '⏩ x2';
+  waveBtn.classList.toggle('hidden', game.wave >= max && !game.waveActive);
+  waveBtn.textContent = game.waveActive ? '⚔️ Набіг триває…'
+    : game.auto ? `⚔️ Набіг ${game.wave + 1} через ${Math.ceil(game.autoTimer)}с`
+    : `⚔️ Впустити набіг ${game.wave + 1}`;
+  $('speedBtn').textContent = `⏩ x${game.speed}`;
+  $('autoBtn').textContent = game.auto ? '🔁 Авто: так' : '🔁 Авто: ні';
+  $('autoBtn').classList.toggle('on', game.auto);
   $('pauseBtn').textContent = game.paused ? '▶ Далі' : '⏸ Пауза';
 
-  $('overlay').classList.toggle('hidden', !game.over);
-  if (game.over) {
-    $('overlayTitle').textContent = game.over === 'win' ? '👑 Підземелля вистояло' : '💔 Серце зруйновано';
-    $('overlayText').textContent = game.over === 'win'
-      ? `Усі ${WAVES.length} набігів відбито. Міцність Серця: ${game.lives}.`
-      : `Авантюристи прорвались до Серця під час набігу ${game.wave}.`;
+  refreshOverlay();
+}
+
+// Вікно поверх поля: стартове меню, перемога, поразка. Кнопки лише ховаємо/показуємо.
+function refreshOverlay() {
+  const over = game.over;
+  $('overlay').classList.toggle('hidden', !over);
+  if (!over) return;
+  const best = loadBest();
+  const bestText = best ? `Рекорд безкінечного режиму: ${best} набігів.` : '';
+  let title, text;
+  if (over === 'menu') {
+    title = '💜 Серце Підземелля';
+    text = `Кампанія — ${CAMPAIGN_WAVES} набігів із босом кожні 10. У безкінечному режимі набіги не закінчуються. ${bestText}`;
+  } else if (over === 'win') {
+    title = '👑 Підземелля вистояло';
+    text = `Усі ${CAMPAIGN_WAVES} набігів відбито. Міцність Серця: ${game.lives}. Можна тримати оборону й далі.`;
+  } else {
+    title = '💔 Серце зруйновано';
+    text = `Авантюристи прорвались до Серця під час набігу ${game.wave}. ${game.mode === 'endless' ? bestText : ''}`;
   }
+  $('overlayTitle').textContent = title;
+  $('overlayText').textContent = text;
+  $('campaignBtn').classList.toggle('hidden', over !== 'menu');
+  $('endlessBtn').classList.toggle('hidden', over !== 'menu');
+  $('continueBtn').classList.toggle('hidden', over !== 'win');
+  $('restartBtn').classList.toggle('hidden', over === 'menu');
+  $('menuBtn').classList.toggle('hidden', over === 'menu');
 }
 
 // ---------- старт ----------
-newGame();
+newGame(DEBUG.has('wave') || DEBUG.has('money') ? 'campaign' : null); // з параметрами відладки — одразу в гру
 requestAnimationFrame(frame);

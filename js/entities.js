@@ -41,11 +41,12 @@ class Enemy {
     this.maxHp = Math.round(def.hp * hpMul);
     this.hp = this.maxHp;
     // броня росте повільніше за HP, інакше на пізніх набігах вона обнуляла б слабких монстрів
-    this.armor = (def.armor || 0) * (1 + (hpMul - 1) * 0.5);
+    this.armor = (def.armor || 0) * (1 + (hpMul - 1) * 0.25);
     this.maxShield = Math.round(this.maxHp * (def.shield || 0));
     this.shield = this.maxShield;
     this.lifeDmg = def.lifeDmg || 1;
     this.stealth = !!def.stealth;
+    this.revealed = 0;    // секунди, поки невидимого підсвічує монстр із detect
     this.healTimer = def.heal ? def.heal.every : 0;
     this.x = PATH_PX[0].x;
     this.y = PATH_PX[0].y;
@@ -61,7 +62,10 @@ class Enemy {
     this.escaped = false;
   }
 
+  get hidden() { return this.stealth && this.revealed <= 0; }
+
   update(dt, game) {
+    if (this.revealed > 0) this.revealed -= dt;
     if (this.slowTimer > 0) {
       this.slowTimer -= dt;
       if (this.slowTimer <= 0) this.slowFactor = 1;
@@ -140,7 +144,7 @@ class Enemy {
 
     // фігурка зверху, повернута за напрямком руху (вперед = +x); невидимий ледь мерехтить
     ctx.save();
-    if (this.stealth) ctx.globalAlpha = 0.28 + Math.sin(time * 6 + this.progress * 0.05) * 0.08;
+    if (this.stealth) ctx.globalAlpha = this.hidden ? 0.28 + Math.sin(time * 6 + this.progress * 0.05) * 0.08 : 0.75;
     ctx.translate(this.x, this.y);
     ctx.rotate(this.dir);
     drawAdventurer(ctx, this.type, r, this.color);
@@ -226,11 +230,17 @@ class Tower {
   get sellValue() { return Math.floor(this.spent * SELL_REFUND); }
 
   update(dt, game) {
+    if (this.def.detect) {
+      // підсвічує невидимих у своєму радіусі — тоді їх б'ють і решта монстрів
+      for (const e of game.enemies) {
+        if (e.stealth && Math.hypot(e.x - this.x, e.y - this.y) <= this.range + e.radius) e.revealed = 0.3;
+      }
+    }
     this.cooldown -= dt;
     if (this.cooldown > 0) return;
     let target = null;
     for (const e of game.enemies) {
-      if (!alive(e) || (e.stealth && !this.def.detect)) continue;
+      if (!alive(e) || (e.hidden && !this.def.detect)) continue;
       if (Math.hypot(e.x - this.x, e.y - this.y) > this.range + e.radius) continue;
       if (!target || e.progress > target.progress) target = e;
     }
@@ -851,7 +861,7 @@ class Projectile {
     for (let i = 0; i < this.chain; i++) {
       let next = null, best = this.chainRange;
       for (const e of game.enemies) {
-        if (!alive(e) || hit.has(e) || (e.stealth && !this.detect)) continue;
+        if (!alive(e) || hit.has(e) || (e.hidden && !this.detect)) continue;
         const d = Math.hypot(e.x - from.x, e.y - from.y);
         if (d <= best) { best = d; next = e; }
       }

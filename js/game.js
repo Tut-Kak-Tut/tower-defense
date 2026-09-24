@@ -20,11 +20,16 @@ const PATH_CELLS = (() => {
 
 let game;
 
-function newGame() {
+// Відладка: index.html?wave=40&money=5000 — почати одразу з 40-го набігу з 5000 душ.
+const DEBUG = new URLSearchParams(location.search);
+
+// mode: 'campaign' | 'endless'; без режиму — стартове меню (гра стоїть, поки over === 'menu').
+function newGame(mode = null) {
   game = {
-    money: START_MONEY,
+    mode: mode || 'campaign',
+    money: +DEBUG.get('money') || START_MONEY,
     lives: START_LIVES,
-    wave: 0,            // номер останньої запущеної хвилі
+    wave: Math.max(0, (+DEBUG.get('wave') || 1) - 1), // номер останньої запущеної хвилі
     waveActive: false,
     spawnQueue: [],
     spawnTimer: 0,
@@ -34,10 +39,31 @@ function newGame() {
     effects: [],
     speed: 1,
     paused: false,
+    auto: false,        // авто-набіг: наступний стартує сам через AUTO_DELAY після зачистки
+    autoTimer: 0,
     heartFlash: 0,      // секунди червоного спалаху Серця після удару
-    over: null,         // 'win' | 'lose'
+    over: mode ? null : 'menu', // 'menu' | 'win' | 'lose'
     seen: new Set(),    // типи авантюристів, що вже з'являлись — для бестіарію
   };
+}
+
+const AUTO_DELAY = 3;
+
+const maxWaves = () => game.mode === 'endless' ? Infinity : CAMPAIGN_WAVES;
+
+// Рекорд безкінечного режиму — у браузері; якщо сховище недоступне, просто не зберігаємо.
+const BEST_KEY = 'dungeon-heart-endless-best';
+function loadBest() {
+  try { return +localStorage.getItem(BEST_KEY) || 0; } catch { return 0; }
+}
+function saveBest(wave) {
+  try { if (wave > loadBest()) localStorage.setItem(BEST_KEY, wave); } catch { /* ігноруємо */ }
+}
+
+// Після перемоги в кампанії — грати далі тим самим підземеллям.
+function continueEndless() {
+  game.mode = 'endless';
+  game.over = null;
 }
 
 function inBounds(col, row) {
@@ -75,9 +101,9 @@ function sellTower(tower) {
 }
 
 function startWave() {
-  if (game.waveActive || game.over || game.wave >= WAVES.length) return;
-  const groups = WAVES[game.wave];
+  if (game.waveActive || game.over || game.wave >= maxWaves()) return;
   game.wave++;
+  const groups = waveGroups(game.wave);
   game.spawnQueue = [];
   groups.forEach(([type, count, interval], gi) => {
     for (let i = 0; i < count; i++) {
@@ -91,14 +117,19 @@ function startWave() {
 }
 
 function update(dt) {
+  if (game.auto && !game.waveActive) {
+    game.autoTimer -= dt;
+    if (game.autoTimer <= 0) startWave();
+  }
+
   // поява ворогів
   if (game.spawnQueue.length) {
     game.spawnTimer -= dt;
-    const hpMul = 1 + (game.wave - 1) * HP_GROWTH;
+    const hp = hpMul(game.wave), reward = rewardMul(game.wave);
     while (game.spawnQueue.length && game.spawnTimer <= 0) {
       const s = game.spawnQueue.shift();
       game.seen.add(s.type);
-      game.enemies.push(new Enemy(s.type, hpMul));
+      game.enemies.push(new Enemy(s.type, hp, reward));
       if (game.spawnQueue.length) game.spawnTimer += game.spawnQueue[0].delay;
     }
   }
@@ -125,19 +156,14 @@ function update(dt) {
 
   if (game.waveActive && !game.spawnQueue.length && !game.enemies.length) {
     game.waveActive = false;
+    game.autoTimer = AUTO_DELAY;
     game.money += WAVE_BONUS + game.wave * 5;
-    if (game.wave >= WAVES.length) game.over = 'win';
+    if (game.mode === 'endless') saveBest(game.wave);
+    if (game.wave >= maxWaves()) game.over = 'win';
   }
 }
 
 // ---------- малювання ----------
-
-// Детермінований "рандом" від координат — щоб візерунок каміння не змінювався між перемальовуваннями.
-function hash(a, b, seed = 0) {
-  let h = (a * 374761393 + b * 668265263 + seed * 2246822519) | 0;
-  h = Math.imul(h ^ (h >>> 13), 1274126177);
-  return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
-}
 
 const isPath = (c, r) => PATH_CELLS.has(c + ',' + r);
 
