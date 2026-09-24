@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Tower Defense</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="app">
+    <header id="hud">
+      <h1>Tower Defense</h1>
+      <div class="stat" title="Гроші">💰 <span id="money"></span></div>
+      <div class="stat" title="Життя">❤️ <span id="lives"></span></div>
+      <div class="stat" title="Хвиля">🌊 <span id="wave"></span></div>
+    </header>
+
+    <main>
+      <div id="board">
+        <canvas id="game" width="800" height="480"></canvas>
+        <div id="overlay" class="hidden">
+          <div class="panel">
+            <h2 id="overlayTitle"></h2>
+            <p id="overlayText"></p>
+            <button id="restartBtn" class="primary">Грати знову</button>
+          </div>
+        </div>
+      </div>
+
+      <aside id="sidebar">
+        <section>
+          <h3>Вежі</h3>
+          <div id="towerList"></div>
+        </section>
+
+        <section id="info" class="hidden">
+          <h3 id="infoName"></h3>
+          <p id="infoStats"></p>
+          <button id="upgradeBtn"></button>
+          <button id="sellBtn" class="danger"></button>
+        </section>
+
+        <section>
+          <button id="waveBtn" class="primary"></button>
+          <div class="row">
+            <button id="speedBtn"></button>
+            <button id="pauseBtn"></button>
+          </div>
+        </section>
+
+        <section class="help">
+          <b>Як грати:</b> вибери вежу і клацни по траві. Клік по вежі — покращити або продати.
+          Не пропусти ворогів до червоного виходу.<br>
+          <kbd>1</kbd>–<kbd>3</kbd> вежа · <kbd>Esc</kbd>/ПКМ скасувати ·
+          <kbd>Enter</kbd> хвиля · <kbd>Пробіл</kbd> пауза
+        </section>
+      </aside>
+    </main>
+  </div>
+
+  <script src="js/config.js"></script>
+  <script src="js/entities.js"></script>
+  <script src="js/game.js"></script>
+  <script src="js/ui.js"></script>
+</body>
+</html>
