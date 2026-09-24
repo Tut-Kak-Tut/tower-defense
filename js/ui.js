@@ -23,9 +23,7 @@ function towerIcon(type, size = 32) {
   return makeIcon(size, g => {
     g.scale(size / 40, size / 40);
     g.translate(0, -2);
-    if (type === 'archer') drawSkeleton(g, -Math.PI / 2);
-    else if (type === 'cannon') drawImp(g, -Math.PI / 2);
-    else drawGhost(g, -Math.PI / 2);
+    TOWER_DRAW[type](g, -Math.PI / 2);
   });
 }
 
@@ -258,11 +256,16 @@ function refreshUpgrade() {
       ['Дальність', now.range.toFixed(2), next && next.range.toFixed(2)],
       ['Атака', now.rate.toFixed(2) + 'с', next && next.rate.toFixed(2) + 'с'],
     ];
-    if (def.splash) rows.push(['Вибух', def.splash + ' кл.', def.splash + ' кл.']);
-    if (def.slow) {
-      const s = `${Math.round((1 - def.slow) * 100)}% · ${def.slowTime}с`;
-      rows.push(['Сповільнення', s, s]);
-    }
+    // незмінні з рівнем — однакові в обох колонках
+    const fixed = (label, v) => rows.push([label, v, v]);
+    const stat = (label, f) => rows.push([label, f(now), next && f(next)]);
+    if (def.splash) fixed('Вибух', def.splash + ' кл.');
+    if (def.slow) fixed('Сповільнення', `${Math.round((1 - def.slow) * 100)}% · ${def.slowTime}с`);
+    if (def.poison) stat('Отрута', s => `${Math.round(s.poison)}/с · ${def.poisonTime}с`);
+    if (def.chain) stat('Стрибків', s => s.chain);
+    if (def.stun) stat('Оглушення', s => `${Math.round(s.stunChance * 100)}% · ${def.stun}с`);
+    if (def.attack === 'beam') fixed('Промінь', 'крізь усіх');
+    if (def.detect) fixed('Бачить невидимих', 'так');
 
     $('upStats').innerHTML = rows.map(([label, a, b]) => {
       if (maxed) return `<tr><td>${label}</td><td class="max" colspan="3">${a}</td></tr>`;

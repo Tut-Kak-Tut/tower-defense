@@ -345,6 +345,60 @@ function drawRange(x, y, range, ok) {
   ctx.stroke();
 }
 
+// Короткі ефекти: fx.t спадає від fx.max до 0.
+function drawEffect(fx) {
+  const k = fx.t / fx.max; // 1 → 0
+  ctx.save();
+  if (fx.kind === 'beam') {
+    // промінь ока: широке сяйво + яскраве ядро
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = fx.color;
+    ctx.globalAlpha = k * 0.5;
+    ctx.lineWidth = 9 * k + 2;
+    ctx.beginPath(); ctx.moveTo(fx.x, fx.y); ctx.lineTo(fx.x2, fx.y2); ctx.stroke();
+    ctx.strokeStyle = '#fff0f2';
+    ctx.globalAlpha = k;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  } else if (fx.kind === 'bolt') {
+    // блискавка лича: ламана з випадковими зламами між цілями
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.strokeStyle = '#efe2ff';
+    ctx.shadowColor = fx.color;
+    ctx.shadowBlur = 10;
+    ctx.globalAlpha = k;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(fx.points[0].x, fx.points[0].y);
+    for (let i = 1; i < fx.points.length; i++) {
+      const a = fx.points[i - 1], b = fx.points[i];
+      for (let j = 1; j <= 3; j++) {
+        const t = j / 4, off = (Math.random() - 0.5) * 10;
+        ctx.lineTo(a.x + (b.x - a.x) * t + off, a.y + (b.y - a.y) * t + off);
+      }
+      ctx.lineTo(b.x, b.y);
+    }
+    ctx.stroke();
+  } else if (fx.kind === 'quake') {
+    // удар голема: кільце, що розходиться по землі
+    ctx.strokeStyle = fx.color;
+    ctx.globalAlpha = k * 0.8;
+    ctx.lineWidth = 4 * k + 1;
+    ctx.beginPath();
+    ctx.arc(fx.x, fx.y, fx.r * (1 - k * 0.7), 0, Math.PI * 2);
+    ctx.stroke();
+  } else {
+    // вибух фаєрбола, хвиля лікування
+    ctx.beginPath();
+    ctx.arc(fx.x, fx.y, fx.r * (1 - k * 0.5), 0, Math.PI * 2);
+    ctx.globalAlpha = k * 0.5;
+    ctx.fillStyle = fx.color;
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
 function draw() {
   drawMap();
   drawTorches();
@@ -367,14 +421,7 @@ function draw() {
   for (const t of game.towers) t.draw(ctx);
   for (const e of game.enemies) e.draw(ctx);
   for (const p of game.projectiles) p.draw(ctx);
-  for (const fx of game.effects) {
-    ctx.beginPath();
-    ctx.arc(fx.x, fx.y, fx.r * (1 - fx.t / fx.max * 0.5), 0, Math.PI * 2);
-    ctx.globalAlpha = fx.t / fx.max * 0.5;
-    ctx.fillStyle = fx.color;
-    ctx.fill();
-    ctx.globalAlpha = 1;
-  }
+  for (const fx of game.effects) drawEffect(fx);
 
   drawVignette();
   drawHeart(); // після віньєтки, щоб головна ціль не тонула в темряві кута

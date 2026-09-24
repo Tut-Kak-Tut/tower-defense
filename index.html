@@ -15,9 +15,24 @@
       <div class="stat souls" title="Душі — платиш ними за монстрів">👻 <span id="money"></span></div>
       <div class="stat heart" title="Міцність Серця">💜 <span id="lives"></span></div>
       <div class="stat raid" title="Набіг">⚔️ <span id="wave"></span></div>
+      <button id="speedBtn" class="hud-btn" title="Швидкість гри"></button>
+      <button id="pauseBtn" class="hud-btn" title="Пауза (Пробіл)"></button>
     </header>
 
     <main>
+      <aside id="left">
+        <section id="raidPanel">
+          <h3 id="raidTitle"></h3>
+          <div id="raidList"></div>
+          <button id="waveBtn" class="primary"></button>
+        </section>
+
+        <section id="bestiary">
+          <h3>Бестіарій</h3>
+          <div id="bestiaryList"></div>
+        </section>
+      </aside>
+
       <div id="board">
         <canvas id="game" width="800" height="480"></canvas>
         <div id="overlay" class="hidden">
@@ -29,33 +44,40 @@
         </div>
       </div>
 
-      <aside id="sidebar">
-        <section>
-          <h3>Монстри</h3>
-          <div id="towerList"></div>
-        </section>
+      <aside id="right">
+        <nav class="tabs">
+          <button id="tabMonsters" class="tab">Монстри</button>
+          <button id="tabUpgrade" class="tab">Посилення</button>
+        </nav>
 
-        <section id="info" class="hidden">
-          <h3 id="infoName"></h3>
-          <p id="infoStats"></p>
-          <button id="upgradeBtn"></button>
-          <button id="sellBtn" class="danger"></button>
-        </section>
-
-        <section>
-          <button id="waveBtn" class="primary"></button>
-          <div class="row">
-            <button id="speedBtn"></button>
-            <button id="pauseBtn"></button>
+        <div class="window">
+          <div id="paneMonsters">
+            <div id="towerList"></div>
+            <p class="help">
+              <b>Ти — володар підземелля.</b> Вибери монстра і посели його в нішу біля коридору.
+              Клік по монстру на полі — посилити або вигнати.<br>
+              <kbd>1</kbd>–<kbd>7</kbd> монстр · <kbd>Esc</kbd>/ПКМ скасувати ·
+              <kbd>Enter</kbd> набіг · <kbd>Пробіл</kbd> пауза
+            </p>
           </div>
-        </section>
 
-        <section class="help">
-          <b>Ти — володар підземелля.</b> Вибери монстра і посели його в нішу біля коридору.
-          Клік по монстру — посилити або вигнати. Не дай авантюристам дістатися Серця.<br>
-          <kbd>1</kbd>–<kbd>3</kbd> монстр · <kbd>Esc</kbd>/ПКМ скасувати ·
-          <kbd>Enter</kbd> набіг · <kbd>Пробіл</kbd> пауза
-        </section>
+          <div id="paneUpgrade">
+            <p id="upEmpty" class="help">Клікни по монстру на полі, щоб побачити, як його можна посилити.</p>
+            <div id="upBody">
+              <div class="up-head">
+                <span id="upIcon"></span>
+                <div>
+                  <div id="upName"></div>
+                  <div id="upLevel"></div>
+                </div>
+              </div>
+              <p id="upDesc"></p>
+              <table id="upStats"></table>
+              <button id="upgradeBtn" class="primary"></button>
+              <button id="sellBtn" class="danger"></button>
+            </div>
+          </div>
+        </div>
       </aside>
     </main>
   </div>

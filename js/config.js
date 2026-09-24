@@ -26,7 +26,10 @@ const LVL_RATE = 0.96;        // пауза між атаками ×0.96 за р
 const UPGRADE_COST_MUL = 0.8; // ціна апгрейду = cost * 0.8 * поточний рівень
 const SELL_REFUND = 0.6;      // при продажу повертається 60% витраченого
 
-// range і splash — у клітинках, rate — секунд між пострілами
+// range і splash — у клітинках, rate — секунд між атаками.
+// attack: 'projectile' (за замовчуванням) | 'aura' (б'є всіх у радіусі) | 'beam' (промінь крізь усіх на лінії).
+// Необов'язкові механіки: splash, slow/slowTime, poison (урон/с крізь броню)/poisonTime,
+// chain (скільки разів перестрибує)/chainRange, stun (с)/stunChance, detect (бачить невидимих).
 const TOWERS = {
   archer: {
     name: 'Скелет-лучник', color: '#e8dcc0', cost: 50,
@@ -40,8 +43,28 @@ const TOWERS = {
   },
   frost: {
     name: 'Привид', color: '#8fe3ff', cost: 75,
-    damage: 4, range: 2.5, rate: 0.9, projSpeed: 400, slow: 0.5, slowTime: 2,
-    desc: 'Крижаний дотик: сповільнює на 50%',
+    damage: 4, range: 2.5, rate: 0.9, projSpeed: 400, slow: 0.5, slowTime: 2, detect: true,
+    desc: 'Крижаний дотик: сповільнює на 50%, бачить невидимих',
+  },
+  spider: {
+    name: 'Печерний павук', color: '#8fd14f', cost: 80,
+    damage: 3, range: 2.5, rate: 1.0, projSpeed: 350, poison: 9, poisonTime: 3, slow: 0.8, slowTime: 1,
+    desc: 'Отрутна павутина: шкода з часом крізь броню, трохи сповільнює',
+  },
+  golem: {
+    name: 'Кам’яний голем', color: '#a89a86', cost: 120, attack: 'aura',
+    damage: 18, range: 1.4, rate: 1.4, stun: 0.6, stunChance: 0.3,
+    desc: 'Б’є по землі: урон усім поруч і шанс оглушити',
+  },
+  lich: {
+    name: 'Лич', color: '#b98cff', cost: 150,
+    damage: 22, range: 3, rate: 1.3, projSpeed: 700, chain: 3, chainRange: 1.8,
+    desc: 'Блискавка перестрибує між авантюристами (−25% за стрибок)',
+  },
+  eye: {
+    name: 'Око-спостерігач', color: '#ff4d6d', cost: 175, attack: 'beam',
+    damage: 30, range: 4, rate: 1.8, detect: true,
+    desc: 'Промінь пробиває всіх на лінії, бачить невидимих',
   },
 };
 

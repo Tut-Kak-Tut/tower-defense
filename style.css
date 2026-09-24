@@ -152,6 +152,7 @@ h3 {
 .foe.locked .f-name { color: var(--muted); letter-spacing: 2px; }
 #raidList .empty { font-size: 13px; color: var(--muted); margin: 4px 0; }
 #bestiaryList { max-height: 330px; overflow-y: auto; padding-right: 2px; }
+#towerList { max-height: 430px; overflow-y: auto; padding-right: 2px; }
 
 /* ---------- вкладки в стилі підземелля ---------- */
 #right { min-width: 0; }

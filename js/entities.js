@@ -12,8 +12,20 @@ function towerStats(def, level) {
     damage: def.damage * Math.pow(LVL_DMG, l),
     range: def.range + LVL_RANGE * l,
     rate: def.rate * Math.pow(LVL_RATE, l),
+    poison: (def.poison || 0) * Math.pow(LVL_DMG, l),
+    stunChance: def.stunChance ? Math.min(0.8, def.stunChance + 0.04 * l) : 0,
+    chain: def.chain ? def.chain + Math.floor(l / 3) : 0,
   };
 }
+
+// Відстань від точки до відрізка — для променя ока.
+function segDist(px, py, x1, y1, x2, y2) {
+  const dx = x2 - x1, dy = y2 - y1;
+  const t = Math.max(0, Math.min(1, ((px - x1) * dx + (py - y1) * dy) / (dx * dx + dy * dy)));
+  return Math.hypot(px - (x1 + dx * t), py - (y1 + dy * t));
+}
+
+const alive = e => !e.dead && !e.escaped;
 
 const PATH_PX = PATH_POINTS.map(([c, r]) => cellCenter(c, r));
 
@@ -218,14 +230,39 @@ class Tower {
     if (this.cooldown > 0) return;
     let target = null;
     for (const e of game.enemies) {
-      if (e.dead || e.escaped || (e.stealth && !this.def.detect)) continue;
+      if (!alive(e) || (e.stealth && !this.def.detect)) continue;
       if (Math.hypot(e.x - this.x, e.y - this.y) > this.range + e.radius) continue;
       if (!target || e.progress > target.progress) target = e;
     }
     if (!target) return;
     this.angle = Math.atan2(target.y - this.y, target.x - this.x);
-    game.projectiles.push(new Projectile(this, target));
-    this.cooldown = towerStats(this.def, this.level).rate;
+    const s = towerStats(this.def, this.level);
+    const attack = this.def.attack || 'projectile';
+    if (attack === 'aura') this.stomp(game, s);
+    else if (attack === 'beam') this.beam(game, s);
+    else game.projectiles.push(new Projectile(this, target));
+    this.cooldown = s.rate;
+  }
+
+  // голем: удар по землі по всіх у радіусі (і невидимих теж — земля трясеться під усіма)
+  stomp(game, s) {
+    const rad = s.range * CELL;
+    for (const e of game.enemies) {
+      if (!alive(e) || Math.hypot(e.x - this.x, e.y - this.y) > rad + e.radius) continue;
+      e.hit(s.damage);
+      if (Math.random() < s.stunChance) e.stun(this.def.stun);
+    }
+    game.effects.push({ kind: 'quake', x: this.x, y: this.y, r: rad, t: 0.35, max: 0.35, color: this.def.color });
+  }
+
+  // око: промінь на всю дальність у напрямку цілі
+  beam(game, s) {
+    const len = s.range * CELL;
+    const x2 = this.x + Math.cos(this.angle) * len, y2 = this.y + Math.sin(this.angle) * len;
+    for (const e of game.enemies) {
+      if (alive(e) && segDist(e.x, e.y, this.x, this.y, x2, y2) <= e.radius + 4) e.hit(s.damage);
+    }
+    game.effects.push({ kind: 'beam', x: this.x, y: this.y, x2, y2, t: 0.25, max: 0.25, color: this.def.color });
   }
 
   draw(ctx) {
@@ -242,9 +279,7 @@ class Tower {
 
     ctx.save();
     ctx.translate(x, y);
-    if (this.type === 'archer') drawSkeleton(ctx, this.angle);
-    else if (this.type === 'cannon') drawImp(ctx, this.angle);
-    else drawGhost(ctx, this.angle);
+    TOWER_DRAW[this.type](ctx, this.angle);
     ctx.restore();
 
     // рівень — руни, що світяться: до 5 фіолетових, далі вони по одній стають золотими
@@ -565,6 +600,192 @@ function drawGhost(ctx, angle) {
   ctx.fill();
 }
 
+function drawSpider(ctx, angle) {
+  ctx.save();
+  ctx.rotate(angle);                         // голова (+x) дивиться на ціль
+  // 8 лапок, що ледь перебирають
+  ctx.strokeStyle = '#2a2230';
+  ctx.lineWidth = 2;
+  ctx.lineCap = 'round';
+  for (let side = -1; side <= 1; side += 2) {
+    for (let i = 0; i < 4; i++) {
+      const wiggle = Math.sin(time * 6 + i * 1.3 + side) * 1.2;
+      const bx = 3 - i * 3;
+      ctx.beginPath();
+      ctx.moveTo(bx, 0);
+      ctx.lineTo(bx + 3 - i * 1.5, side * (9 + wiggle));
+      ctx.lineTo(bx + 5 - i * 3.5, side * (15 + wiggle));
+      ctx.stroke();
+    }
+  }
+  // черевце з отруйним візерунком
+  ctx.beginPath();
+  ctx.ellipse(-6, 0, 8, 6.5, 0, 0, Math.PI * 2);
+  ctx.fillStyle = '#1c1622';
+  ctx.fill();
+  ctx.fillStyle = TOWERS.spider.color;
+  ctx.beginPath();
+  ctx.moveTo(-10, 0); ctx.lineTo(-6, -2.5); ctx.lineTo(-2, 0); ctx.lineTo(-6, 2.5);
+  ctx.fill();
+  // головогруди й очі
+  ctx.beginPath();
+  ctx.arc(4, 0, 4.5, 0, Math.PI * 2);
+  ctx.fillStyle = '#2e2436';
+  ctx.fill();
+  ctx.fillStyle = '#ff3b3b';
+  for (const [ex, ey] of [[6, -1.6], [6, 1.6], [4.5, -2.8], [4.5, 2.8]]) ctx.fillRect(ex - 0.8, ey - 0.8, 1.6, 1.6);
+  ctx.restore();
+}
+
+function drawGolem(ctx, angle) {
+  const breathe = Math.sin(time * 2) * 0.6;
+  // кулаки — з боків, трохи вперед до цілі
+  const fx = Math.cos(angle) * 4, fy = Math.sin(angle) * 4;
+  ctx.fillStyle = '#7d7163';
+  ctx.strokeStyle = 'rgba(0,0,0,0.5)';
+  ctx.lineWidth = 1.5;
+  for (const s of [-1, 1]) {
+    ctx.beginPath();
+    ctx.rect(s * 13 - 4 + fx, -2 + fy, 8, 8);
+    ctx.fill();
+    ctx.stroke();
+  }
+  // кам'яний тулуб з брил
+  ctx.fillStyle = TOWERS.golem.color;
+  ctx.beginPath();
+  ctx.moveTo(-10, -8 - breathe); ctx.lineTo(10, -9 - breathe); ctx.lineTo(12, 6); ctx.lineTo(7, 12);
+  ctx.lineTo(-8, 12); ctx.lineTo(-12, 5); ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  ctx.strokeStyle = 'rgba(0,0,0,0.35)';     // шви між каменями
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(-11, 2); ctx.lineTo(0, 4); ctx.lineTo(11, 1);
+  ctx.moveTo(0, 4); ctx.lineTo(-1, 12);
+  ctx.stroke();
+  ctx.fillStyle = 'rgba(80, 130, 60, 0.7)';  // мох
+  ctx.beginPath();
+  ctx.ellipse(-6, -7 - breathe, 4, 2, 0, 0, Math.PI * 2);
+  ctx.fill();
+  // голова-брила з рунними очима
+  ctx.fillStyle = '#948878';
+  ctx.fillRect(-6, -16 - breathe, 12, 9);
+  ctx.save();
+  ctx.shadowColor = '#ff9a3c';
+  ctx.shadowBlur = 8;
+  ctx.fillStyle = '#ffb347';
+  ctx.fillRect(-4, -13 - breathe, 3, 2);
+  ctx.fillRect(1, -13 - breathe, 3, 2);
+  ctx.fillRect(-1, 0, 2, 5);                 // руна на грудях
+  ctx.restore();
+}
+
+function drawLich(ctx, angle) {
+  const hover = Math.sin(time * 2.5) * 1.5;
+  ctx.save();
+  ctx.translate(0, hover);
+  // мантія
+  ctx.fillStyle = '#2a1840';
+  ctx.beginPath();
+  ctx.moveTo(-11, 12); ctx.lineTo(-7, -4); ctx.lineTo(7, -4); ctx.lineTo(11, 12);
+  ctx.quadraticCurveTo(0, 8, -11, 12);
+  ctx.fill();
+  ctx.strokeStyle = TOWERS.lich.color;
+  ctx.lineWidth = 1;
+  ctx.stroke();
+  // посох з кристалом у напрямку цілі
+  const sx = Math.cos(angle) * 13, sy = Math.sin(angle) * 13;
+  ctx.strokeStyle = '#4a3a2a';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(sx * 0.2, sy * 0.2 + 2); ctx.lineTo(sx, sy);
+  ctx.stroke();
+  ctx.save();
+  ctx.shadowColor = TOWERS.lich.color;
+  ctx.shadowBlur = 12;
+  ctx.fillStyle = '#e6d4ff';
+  ctx.beginPath();
+  ctx.arc(sx, sy, 2.5 + Math.sin(time * 10) * 0.5, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+  // череп у короні
+  ctx.beginPath();
+  ctx.arc(0, -8, 6.5, 0, Math.PI * 2);
+  ctx.fillStyle = '#ddd6c4';
+  ctx.fill();
+  ctx.fillStyle = '#1a1014';
+  ctx.beginPath();
+  ctx.arc(-2.5, -8, 1.8, 0, Math.PI * 2);
+  ctx.arc(2.5, -8, 1.8, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#7dffb0';                 // зелені вогники в очницях
+  ctx.fillRect(-3, -8.5, 1, 1);
+  ctx.fillRect(2, -8.5, 1, 1);
+  ctx.fillStyle = '#c9a227';
+  ctx.beginPath();
+  ctx.moveTo(-6, -12); ctx.lineTo(-5, -17); ctx.lineTo(-2.5, -13.5); ctx.lineTo(0, -18);
+  ctx.lineTo(2.5, -13.5); ctx.lineTo(5, -17); ctx.lineTo(6, -12); ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawEye(ctx, angle) {
+  const bob = Math.sin(time * 2) * 1.5;
+  ctx.save();
+  ctx.translate(0, bob - 2);
+  // стебельця з маленькими очима зверху
+  for (let i = 0; i < 4; i++) {
+    const a = -Math.PI / 2 + (i - 1.5) * 0.55;
+    const sway = Math.sin(time * 3 + i) * 0.15;
+    const ex = Math.cos(a + sway) * 15, ey = Math.sin(a + sway) * 15;
+    ctx.strokeStyle = '#6a2a3a';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(Math.cos(a) * 8, Math.sin(a) * 8);
+    ctx.lineTo(ex, ey);
+    ctx.stroke();
+    ctx.fillStyle = '#f2e6e0';
+    ctx.beginPath();
+    ctx.arc(ex, ey, 2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#1a1014';
+    ctx.fillRect(ex - 0.6, ey - 0.6, 1.2, 1.2);
+  }
+  // тіло-куля
+  const grad = ctx.createRadialGradient(-3, -3, 2, 0, 0, 11);
+  grad.addColorStop(0, '#c2485e');
+  grad.addColorStop(1, '#5a1426');
+  ctx.beginPath();
+  ctx.arc(0, 0, 10.5, 0, Math.PI * 2);
+  ctx.fillStyle = grad;
+  ctx.fill();
+  // велике око дивиться на ціль
+  const px = Math.cos(angle) * 2.5, py = Math.sin(angle) * 2.5;
+  ctx.fillStyle = '#fff4ea';
+  ctx.beginPath();
+  ctx.ellipse(px * 0.5, py * 0.5, 6.5, 6, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.save();
+  ctx.shadowColor = TOWERS.eye.color;
+  ctx.shadowBlur = 8;
+  ctx.fillStyle = TOWERS.eye.color;
+  ctx.beginPath();
+  ctx.arc(px, py, 3.5, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+  ctx.fillStyle = '#12080c';
+  ctx.beginPath();
+  ctx.ellipse(px * 1.2, py * 1.2, 1.2, 2.8, angle, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+// Малюнок монстра за ключем — і на полі, і в іконках.
+const TOWER_DRAW = {
+  archer: drawSkeleton, cannon: drawImp, frost: drawGhost,
+  spider: drawSpider, golem: drawGolem, lich: drawLich, eye: drawEye,
+};
+
 class Projectile {
   constructor(tower, target) {
     this.x = tower.x;
@@ -572,11 +793,17 @@ class Projectile {
     this.target = target;
     this.tx = target.x;
     this.ty = target.y;
-    this.speed = tower.def.projSpeed;
-    this.damage = tower.damage;
-    this.splash = tower.def.splash ? tower.def.splash * CELL : 0;
-    this.slow = tower.def.slow || 0;
-    this.slowTime = tower.def.slowTime || 0;
+    const def = tower.def, s = towerStats(def, tower.level);
+    this.speed = def.projSpeed;
+    this.damage = s.damage;
+    this.splash = def.splash ? def.splash * CELL : 0;
+    this.slow = def.slow || 0;
+    this.slowTime = def.slowTime || 0;
+    this.poison = s.poison;
+    this.poisonTime = def.poisonTime || 0;
+    this.chain = s.chain;
+    this.chainRange = (def.chainRange || 0) * CELL;
+    this.detect = !!def.detect;
     this.color = tower.def.color;
     this.kind = tower.type;
     this.angle = tower.angle;
@@ -610,14 +837,38 @@ class Projectile {
         if (Math.hypot(e.x - this.x, e.y - this.y) <= this.splash + e.radius) this.applyTo(e);
       }
       game.effects.push({ x: this.x, y: this.y, r: this.splash, t: 0.25, max: 0.25, color: this.color });
-    } else if (!this.target.dead && !this.target.escaped) {
+    } else if (alive(this.target)) {
       this.applyTo(this.target);
+      if (this.chain) this.jump(game);
     }
+  }
+
+  // блискавка лича: від цілі до найближчого ще не враженого, урон −25% за стрибок
+  jump(game) {
+    const hit = new Set([this.target]);
+    const points = [{ x: this.target.x, y: this.target.y }];
+    let from = this.target, dmg = this.damage;
+    for (let i = 0; i < this.chain; i++) {
+      let next = null, best = this.chainRange;
+      for (const e of game.enemies) {
+        if (!alive(e) || hit.has(e) || (e.stealth && !this.detect)) continue;
+        const d = Math.hypot(e.x - from.x, e.y - from.y);
+        if (d <= best) { best = d; next = e; }
+      }
+      if (!next) break;
+      dmg *= 0.75;
+      next.hit(dmg);
+      hit.add(next);
+      points.push({ x: next.x, y: next.y });
+      from = next;
+    }
+    if (points.length > 1) game.effects.push({ kind: 'bolt', points, t: 0.2, max: 0.2, color: this.color });
   }
 
   applyTo(e) {
     e.hit(this.damage);
     if (this.slow) e.slow(this.slow, this.slowTime);
+    if (this.poison) e.poison(this.poison, this.poisonTime);
   }
 
   draw(ctx) {
@@ -637,6 +888,25 @@ class Projectile {
       ctx.fill();
       ctx.fillStyle = '#8b1e3f';
       ctx.fillRect(-10, -2, 3, 4);
+    } else if (this.kind === 'spider') {
+      // грудка павутини з отрутою, що крутиться в польоті
+      ctx.rotate(time * 8);
+      ctx.strokeStyle = 'rgba(230, 240, 220, 0.85)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      for (let i = 0; i < 4; i++) {
+        const a = i * Math.PI / 4;
+        ctx.moveTo(Math.cos(a) * 6, Math.sin(a) * 6);
+        ctx.lineTo(-Math.cos(a) * 6, -Math.sin(a) * 6);
+      }
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(0, 0, 3.5, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.fillStyle = this.color;
+      ctx.beginPath();
+      ctx.arc(0, 0, 2, 0, Math.PI * 2);
+      ctx.fill();
     } else {
       // фаєрбол імпа або крижана куля привида — з сяйвом
       const fire = this.kind === 'cannon';
