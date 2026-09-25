@@ -11,18 +11,19 @@ function towerStats(def, level) {
   if (def.attack === 'web') {
     // павутина: росте лише сповільнення (менше slow = сильніше) і трохи радіус, отрута стала
     return {
-      damage: 0, rate: 0, poison: def.poison,
+      damage: 0, rate: 0, poison: def.poison, poisonPct: def.poisonPct + def.poisonPctLvl * l,
       range: def.range + def.webRangeLvl * l,
       slow: Math.max(0.2, def.slow - def.webSlowLvl * l),
       stunChance: 0, chain: 0,
     };
   }
   return {
-    damage: def.damage * Math.pow(LVL_DMG, l),
+    damage: def.damage * Math.pow(def.dmgLvl || LVL_DMG, l),
     range: def.range + LVL_RANGE * l,
     rate: def.rate * Math.pow(LVL_RATE, l),
     poison: (def.poison || 0) * Math.pow(LVL_DMG, l),
-    slow: def.slow || 0,
+    slow: def.slow ? Math.max(0.3, def.slow - (def.slowLvl || 0) * l) : 0,
+    frail: def.frail ? def.frail + def.frailLvl * l : 0,
     stunChance: def.stunChance ? Math.min(0.8, def.stunChance + 0.04 * l) : 0,
     chain: def.chain ? def.chain + Math.floor(l / 3) : 0,
   };
@@ -77,6 +78,8 @@ class Enemy {
     this.poisonDps = 0;
     this.poisonTimer = 0;
     this.poisonSrc = null; // чия отрута — для статистики
+    this.frail = 0;        // крихкість від холоду привида: +частка до всього урону
+    this.frailTimer = 0;
     this.dir = 0;
     this.dead = false;
     this.escaped = false;
@@ -86,6 +89,7 @@ class Enemy {
 
   update(dt, game) {
     if (this.revealed > 0) this.revealed -= dt;
+    if (this.frailTimer > 0 && (this.frailTimer -= dt) <= 0) this.frail = 0;
     this.sinceHit += dt;
     if (this.def.shieldRegen && this.sinceHit >= SHIELD_REGEN_DELAY) {
       this.shield = Math.min(this.maxShield, this.shield + this.maxShield * this.def.shieldRegen * dt);
@@ -141,6 +145,7 @@ class Enemy {
   hit(damage, pierce = false, src = null) {
     if (this.dead) return;
     this.sinceHit = 0;
+    damage *= 1 + this.frail;
     if (!pierce && this.armor) damage = Math.max(damage * 0.2, damage - this.armor);
     let dealt = 0;
     if (this.shield > 0) {
@@ -164,6 +169,11 @@ class Enemy {
     if (this.def.slowImmune) return;
     this.slowFactor = Math.min(this.slowFactor, factor);
     this.slowTimer = Math.max(this.slowTimer, time);
+  }
+
+  makeFrail(amount, time) {
+    this.frail = Math.max(this.frail, amount);
+    this.frailTimer = Math.max(this.frailTimer, time);
   }
 
   stun(time) {
@@ -340,7 +350,7 @@ class Tower {
     for (const e of game.enemies) {
       if (!alive(e) || Math.hypot(e.x - this.x, e.y - this.y) > rad + e.radius) continue;
       e.slow(s.slow, WEB_LINGER);
-      e.poison(s.poison, WEB_LINGER, this.type);
+      e.poison(s.poison + e.maxHp * s.poisonPct, WEB_LINGER, this.type);
     }
   }
 
@@ -917,7 +927,8 @@ class Projectile {
     this.speed = def.projSpeed;
     this.damage = s.damage;
     this.splash = def.splash ? def.splash * CELL : 0;
-    this.slow = def.slow || 0;
+    this.slow = s.slow;
+    this.frail = s.frail;
     this.slowTime = def.slowTime || 0;
     this.poison = s.poison;
     this.poisonTime = def.poisonTime || 0;
@@ -987,6 +998,7 @@ class Projectile {
   }
 
   applyTo(e) {
+    if (this.frail) e.makeFrail(this.frail, this.slowTime);
     e.hit(this.damage, false, this.src);
     if (this.slow) e.slow(this.slow, this.slowTime);
     if (this.poison) e.poison(this.poison, this.poisonTime, this.src);

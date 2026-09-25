@@ -30,10 +30,12 @@ const MAX_TOWERS = 18;        // скільки монстрів може жит
 // range і splash — у клітинках, rate — секунд між атаками.
 // attack: 'projectile' (за замовчуванням) | 'aura' (б'є всіх у радіусі) | 'beam' (промінь крізь усіх на лінії)
 //         | 'web' (павук один раз плете павутину навколо себе; поки він стоїть, усі в ній сповільнені
-//           й отруєні. З рівнем ростуть лише сповільнення (webSlowLvl) і трохи радіус (webRangeLvl), отрута стала).
+//           й отруєні: poison/с + poisonPct від maxHp за секунду. З рівнем ростуть сповільнення (webSlowLvl),
+//           радіус (webRangeLvl) і частка отрути (poisonPctLvl)).
 // Необов'язкові механіки: splash, slow/slowTime, poison (урон/с крізь броню)/poisonTime,
 // chain (скільки разів перестрибує)/chainRange, stun (с)/stunChance, detect (бачить невидимих),
-// fixedDir (промінь б'є лише в обраний гравцем бік світу, а не в ціль), beamWidth (півширина променя, кл.).
+// slowLvl (сповільнення міцнішає з рівнем), frail/frailLvl (ціль отримує +frail урону від усіх, поки сповільнена),
+// dmgLvl (свій множник урону за рівень замість LVL_DMG — для монстрів, що б'ють по натовпу), fixedDir (промінь б'є лише в обраний гравцем бік світу, а не в ціль), beamWidth (півширина променя, кл.).
 const TOWERS = {
   archer: {
     name: 'Скелет-лучник', color: '#e8dcc0', cost: 50,
@@ -47,17 +49,19 @@ const TOWERS = {
   },
   frost: {
     name: 'Привид', color: '#8fe3ff', cost: 75,
-    damage: 4, range: 2.5, rate: 0.9, projSpeed: 400, slow: 0.5, slowTime: 2, detect: true,
-    desc: 'Крижаний дотик: сповільнює на 50%, підсвічує невидимих для всіх',
+    damage: 4, range: 2.5, rate: 0.9, projSpeed: 400, slow: 0.5, slowTime: 2, slowLvl: 0.015, detect: true,
+    frail: 0.2, frailLvl: 0.015,
+    desc: 'Крижаний дотик: сповільнює, робить крихким (усі монстри б’ють його сильніше), підсвічує невидимих',
   },
   spider: {
     name: 'Печерний павук', color: '#8fd14f', cost: 80,
-    attack: 'web', damage: 0, range: 1.6, rate: 0, poison: 2, slow: 0.65, webSlowLvl: 0.035, webRangeLvl: 0.06,
-    desc: 'Обплітає павутиною все навколо себе: у ній авантюристи вгрузають і слабко труяться (крізь броню)',
+    attack: 'web', damage: 0, range: 1.6, rate: 0, poison: 2, poisonPct: 0.008, poisonPctLvl: 0.0008,
+    slow: 0.65, webSlowLvl: 0.035, webRangeLvl: 0.06,
+    desc: 'Обплітає павутиною все навколо себе: у ній авантюристи вгрузають і труяться (крізь броню, частка від їхнього здоров’я)',
   },
   golem: {
     name: 'Кам’яний голем', color: '#a89a86', cost: 120, attack: 'aura',
-    damage: 18, range: 1.4, rate: 1.4, stun: 0.6, stunChance: 0.3,
+    damage: 18, range: 1.4, rate: 1.4, stun: 0.6, stunChance: 0.3, dmgLvl: 1.2,
     desc: 'Б’є по землі: урон усім поруч і шанс оглушити',
   },
   lich: {
@@ -67,7 +71,7 @@ const TOWERS = {
   },
   eye: {
     name: 'Біхолдер', color: '#ff4d6d', cost: 175, attack: 'beam', fixedDir: true, beamWidth: 1,
-    damage: 30, range: 5, rate: 2.2, detect: true,
+    damage: 30, range: 5, rate: 2.2, detect: true, dmgLvl: 1.2,
     desc: 'Промінь у вибраний бік (↑↓←→) пробиває всіх на лінії, підсвічує невидимих',
   },
 };
