@@ -37,8 +37,8 @@ const MAX_TOWERS = 18;        // скільки монстрів може жит
 const TOWERS = {
   archer: {
     name: 'Скелет-лучник', color: '#e8dcc0', cost: 50,
-    damage: 12, range: 3, rate: 0.5, projSpeed: 450,
-    desc: 'Часто стріляє в одного авантюриста',
+    damage: 9, range: 4.5, rate: 0.9, projSpeed: 550,
+    desc: 'Далекобійний: влучає в одного авантюриста здалеку, але б’є слабко',
   },
   cannon: {
     name: 'Вогняний імп', color: '#ff7a2f', cost: 100,
