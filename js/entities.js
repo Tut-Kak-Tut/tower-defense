@@ -27,6 +27,12 @@ function segDist(px, py, x1, y1, x2, y2) {
 
 const alive = e => !e.dead && !e.escaped;
 
+// Сторони світу для променя біхолдера: індекс = tower.dir, кут = dir * π/2.
+const DIRS = [
+  { dx: 1, dy: 0, name: 'праворуч' }, { dx: 0, dy: 1, name: 'вниз' },
+  { dx: -1, dy: 0, name: 'ліворуч' }, { dx: 0, dy: -1, name: 'вгору' },
+];
+
 const PATH_PX = PATH_POINTS.map(([c, r]) => cellCenter(c, r));
 
 class Enemy {
@@ -220,6 +226,30 @@ class Tower {
     this.spent = this.def.cost;
     this.cooldown = 0;
     this.angle = -Math.PI / 2;
+    if (this.def.fixedDir) this.setDir(3);
+  }
+
+  setDir(dir) {
+    this.dir = (dir + 4) % 4;
+    this.angle = this.dir * Math.PI / 2;
+  }
+
+  // кінець променя біхолдера на всю дальність у його бік
+  beamEnd(range = this.range) {
+    const d = DIRS[this.dir];
+    return { x: this.x + d.dx * range, y: this.y + d.dy * range };
+  }
+
+  // чи зачепить промінь авантюриста: смуга завширшки 2 × beamWidth клітинок + сам авантюрист
+  inBeam(e, x2, y2) {
+    return segDist(e.x, e.y, this.x, this.y, x2, y2) <= e.radius + 4 + (this.def.beamWidth || 0) * CELL;
+  }
+
+  // хто в зоні дії: у колі дальності, а для біхолдера — на лінії його променя
+  reaches(e) {
+    if (!this.def.fixedDir) return Math.hypot(e.x - this.x, e.y - this.y) <= this.range + e.radius;
+    const end = this.beamEnd();
+    return this.inBeam(e, end.x, end.y);
   }
 
   get damage() { return towerStats(this.def, this.level).damage; }
@@ -233,19 +263,19 @@ class Tower {
     if (this.def.detect) {
       // підсвічує невидимих у своєму радіусі — тоді їх б'ють і решта монстрів
       for (const e of game.enemies) {
-        if (e.stealth && Math.hypot(e.x - this.x, e.y - this.y) <= this.range + e.radius) e.revealed = 0.3;
+        if (e.stealth && this.reaches(e)) e.revealed = 0.3;
       }
     }
     this.cooldown -= dt;
     if (this.cooldown > 0) return;
     let target = null;
     for (const e of game.enemies) {
-      if (!alive(e) || (e.hidden && !this.def.detect)) continue;
-      if (Math.hypot(e.x - this.x, e.y - this.y) > this.range + e.radius) continue;
+      // біхолдер не повертається — стріляє, лише коли хтось на лінії його променя
+      if (!alive(e) || (e.hidden && !this.def.detect) || !this.reaches(e)) continue;
       if (!target || e.progress > target.progress) target = e;
     }
     if (!target) return;
-    this.angle = Math.atan2(target.y - this.y, target.x - this.x);
+    if (!this.def.fixedDir) this.angle = Math.atan2(target.y - this.y, target.x - this.x);
     const s = towerStats(this.def, this.level);
     const attack = this.def.attack || 'projectile';
     if (attack === 'aura') this.stomp(game, s);
@@ -265,14 +295,15 @@ class Tower {
     game.effects.push({ kind: 'quake', x: this.x, y: this.y, r: rad, t: 0.35, max: 0.35, color: this.def.color });
   }
 
-  // око: промінь на всю дальність у напрямку цілі
+  // біхолдер: промінь на всю дальність у напрямку angle (для fixedDir — обраний бік світу)
   beam(game, s) {
     const len = s.range * CELL;
     const x2 = this.x + Math.cos(this.angle) * len, y2 = this.y + Math.sin(this.angle) * len;
     for (const e of game.enemies) {
-      if (alive(e) && segDist(e.x, e.y, this.x, this.y, x2, y2) <= e.radius + 4) e.hit(s.damage);
+      if (alive(e) && this.inBeam(e, x2, y2)) e.hit(s.damage);
     }
-    game.effects.push({ kind: 'beam', x: this.x, y: this.y, x2, y2, t: 0.25, max: 0.25, color: this.def.color });
+    game.effects.push({ kind: 'beam', x: this.x, y: this.y, x2, y2, w: (this.def.beamWidth || 0) * CELL,
+      t: 0.3, max: 0.3, color: this.def.color });
   }
 
   draw(ctx) {
@@ -739,61 +770,91 @@ function drawLich(ctx, angle) {
   ctx.restore();
 }
 
-function drawEye(ctx, angle) {
+function drawBeholder(ctx, angle) {
   const bob = Math.sin(time * 2) * 1.5;
   ctx.save();
-  ctx.translate(0, bob - 2);
-  // стебельця з маленькими очима зверху
-  for (let i = 0; i < 4; i++) {
-    const a = -Math.PI / 2 + (i - 1.5) * 0.55;
-    const sway = Math.sin(time * 3 + i) * 0.15;
-    const ex = Math.cos(a + sway) * 15, ey = Math.sin(a + sway) * 15;
+  ctx.translate(0, bob - 1);
+  // вісім стебелець з очима віялом над тілом, кожне хилиться по-своєму
+  for (let i = 0; i < 8; i++) {
+    const a = -Math.PI / 2 + (i - 3.5) * 0.36;
+    const sway = Math.sin(time * 2.6 + i * 1.7) * 0.18;
+    const len = 15 + (i % 2) * 2.5;
+    const ex = Math.cos(a + sway) * len, ey = Math.sin(a + sway) * len;
+    const bx = Math.cos(a - sway) * len * 0.6, by = Math.sin(a - sway) * len * 0.6;
     ctx.strokeStyle = '#6a2a3a';
-    ctx.lineWidth = 1.5;
+    ctx.lineWidth = 1.6;
     ctx.beginPath();
     ctx.moveTo(Math.cos(a) * 8, Math.sin(a) * 8);
-    ctx.lineTo(ex, ey);
+    ctx.quadraticCurveTo(bx, by, ex, ey);
     ctx.stroke();
     ctx.fillStyle = '#f2e6e0';
     ctx.beginPath();
-    ctx.arc(ex, ey, 2, 0, Math.PI * 2);
+    ctx.arc(ex, ey, 2.1, 0, Math.PI * 2);
     ctx.fill();
-    ctx.fillStyle = '#1a1014';
-    ctx.fillRect(ex - 0.6, ey - 0.6, 1.2, 1.2);
+    ctx.fillStyle = '#1a1014';                    // маленькі зіниці теж косять у бік променя
+    ctx.beginPath();
+    ctx.arc(ex + Math.cos(angle) * 0.8, ey + Math.sin(angle) * 0.8, 0.9, 0, Math.PI * 2);
+    ctx.fill();
   }
-  // тіло-куля
-  const grad = ctx.createRadialGradient(-3, -3, 2, 0, 0, 11);
-  grad.addColorStop(0, '#c2485e');
-  grad.addColorStop(1, '#5a1426');
+  // тіло-куля з лускою
+  const grad = ctx.createRadialGradient(-3, -4, 2, 0, 0, 12);
+  grad.addColorStop(0, '#c9506a');
+  grad.addColorStop(1, '#4e1022');
   ctx.beginPath();
-  ctx.arc(0, 0, 10.5, 0, Math.PI * 2);
+  ctx.arc(0, 0, 11.5, 0, Math.PI * 2);
   ctx.fillStyle = grad;
   ctx.fill();
-  // велике око дивиться на ціль
-  const px = Math.cos(angle) * 2.5, py = Math.sin(angle) * 2.5;
+  ctx.strokeStyle = 'rgba(0,0,0,0.5)';
+  ctx.lineWidth = 1.2;
+  ctx.stroke();
+  // паща із зубами внизу
+  ctx.fillStyle = '#1c070d';
+  ctx.beginPath();
+  ctx.ellipse(0, 6.2, 7, 3.2, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#efe6d2';
+  for (let i = 0; i < 5; i++) {
+    const tx = -5 + i * 2.5;
+    ctx.beginPath();                               // верхні ікла вниз
+    ctx.moveTo(tx - 1, 3.4); ctx.lineTo(tx + 1, 3.4); ctx.lineTo(tx, 5.6);
+    ctx.fill();
+  }
+  for (let i = 0; i < 4; i++) {
+    const tx = -3.75 + i * 2.5;
+    ctx.beginPath();                               // нижні вгору
+    ctx.moveTo(tx - 0.9, 9); ctx.lineTo(tx + 0.9, 9); ctx.lineTo(tx, 7.1);
+    ctx.fill();
+  }
+  // велике центральне око дивиться в бік променя
+  const px = Math.cos(angle) * 2.2, py = Math.sin(angle) * 1.6;
   ctx.fillStyle = '#fff4ea';
   ctx.beginPath();
-  ctx.ellipse(px * 0.5, py * 0.5, 6.5, 6, 0, 0, Math.PI * 2);
+  ctx.ellipse(0, -3, 6.2, 4.6, 0, 0, Math.PI * 2);
   ctx.fill();
   ctx.save();
   ctx.shadowColor = TOWERS.eye.color;
   ctx.shadowBlur = 8;
   ctx.fillStyle = TOWERS.eye.color;
   ctx.beginPath();
-  ctx.arc(px, py, 3.5, 0, Math.PI * 2);
+  ctx.arc(px, py - 3, 3.2, 0, Math.PI * 2);
   ctx.fill();
   ctx.restore();
   ctx.fillStyle = '#12080c';
   ctx.beginPath();
-  ctx.ellipse(px * 1.2, py * 1.2, 1.2, 2.8, angle, 0, Math.PI * 2);
+  ctx.ellipse(px * 1.2, py * 1.2 - 3, 1, 2.6, 0, 0, Math.PI * 2);
   ctx.fill();
+  ctx.strokeStyle = '#3a0c18';                     // важка повіка зверху
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.ellipse(0, -3, 6.2, 4.6, 0, Math.PI * 1.1, Math.PI * 1.9);
+  ctx.stroke();
   ctx.restore();
 }
 
 // Малюнок монстра за ключем — і на полі, і в іконках.
 const TOWER_DRAW = {
   archer: drawSkeleton, cannon: drawImp, frost: drawGhost,
-  spider: drawSpider, golem: drawGolem, lich: drawLich, eye: drawEye,
+  spider: drawSpider, golem: drawGolem, lich: drawLich, eye: drawBeholder,
 };
 
 class Projectile {

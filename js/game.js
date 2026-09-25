@@ -82,8 +82,37 @@ function placeTower(type, col, row) {
   const cost = TOWERS[type].cost;
   if (!canPlace(col, row) || game.money < cost) return false;
   game.money -= cost;
-  game.towers.push(new Tower(type, col, row));
+  game.towers.push(newTower(type, col, row));
   return true;
+}
+
+// Новий монстр; біхолдер одразу дивиться туди, де на лінії його променя найбільше коридору.
+function newTower(type, col, row) {
+  const t = new Tower(type, col, row);
+  if (t.def.fixedDir) t.setDir(bestDir(col, row, t.def.range));
+  return t;
+}
+
+function bestDir(col, row, range) {
+  let best = 3, bestN = -1;
+  DIRS.forEach((d, i) => {
+    const n = beamCoverage(col, row, range, i);
+    if (n > bestN) { bestN = n; best = i; }
+  });
+  return best;
+}
+
+// Скільки клітинок коридору накриває смуга променя біхолдера з клітинки col,row у бік dir.
+function beamCoverage(col, row, range, dir) {
+  const d = DIRS[dir], half = TOWERS.eye.beamWidth;
+  let n = 0;
+  for (const key of PATH_CELLS) {
+    const [c, r] = key.split(',').map(Number);
+    const along = (c - col) * d.dx + (r - row) * d.dy;      // уздовж променя
+    const side = Math.abs((c - col) * d.dy - (r - row) * d.dx); // убік від осі
+    if (along >= 1 && along <= range && side <= half) n++;
+  }
+  return n;
 }
 
 function upgradeTower(tower) {
@@ -371,18 +400,40 @@ function drawRange(x, y, range, ok) {
   ctx.stroke();
 }
 
+// Куди б'є біхолдер: смуга на ширину променя + пунктир по осі.
+function drawBeamLine(t, ok) {
+  const end = t.beamEnd();
+  ctx.save();
+  ctx.lineCap = 'round';
+  ctx.strokeStyle = ok ? 'rgba(255,77,109,0.16)' : 'rgba(239,71,111,0.25)';
+  ctx.lineWidth = ((t.def.beamWidth || 0) * 2 + 0.5) * CELL;
+  ctx.beginPath(); ctx.moveTo(t.x, t.y); ctx.lineTo(end.x, end.y); ctx.stroke();
+  ctx.strokeStyle = ok ? 'rgba(255,200,210,0.75)' : 'rgba(239,71,111,0.8)';
+  ctx.lineWidth = 1.5;
+  ctx.setLineDash([6, 5]);
+  ctx.lineDashOffset = -time * 20;
+  ctx.stroke();
+  ctx.restore();
+}
+
 // Короткі ефекти: fx.t спадає від fx.max до 0.
 function drawEffect(fx) {
   const k = fx.t / fx.max; // 1 → 0
   ctx.save();
   if (fx.kind === 'beam') {
-    // промінь ока: широке сяйво + яскраве ядро
+    // промінь біхолдера: широкий «погляд» + сяйво + яскраве ядро
     ctx.globalCompositeOperation = 'lighter';
     ctx.lineCap = 'round';
     ctx.strokeStyle = fx.color;
+    ctx.beginPath(); ctx.moveTo(fx.x, fx.y); ctx.lineTo(fx.x2, fx.y2);
+    if (fx.w) {
+      ctx.globalAlpha = k * 0.18;
+      ctx.lineWidth = fx.w * 2 * (0.6 + 0.4 * k);
+      ctx.stroke();
+    }
     ctx.globalAlpha = k * 0.5;
     ctx.lineWidth = 9 * k + 2;
-    ctx.beginPath(); ctx.moveTo(fx.x, fx.y); ctx.lineTo(fx.x2, fx.y2); ctx.stroke();
+    ctx.stroke();
     ctx.strokeStyle = '#fff0f2';
     ctx.globalAlpha = k;
     ctx.lineWidth = 2;
@@ -435,14 +486,18 @@ function draw() {
     const ok = canPlace(col, row) && game.money >= TOWERS[ui.placing].cost;
     ctx.fillStyle = ok ? 'rgba(150,95,220,0.35)' : 'rgba(239,71,111,0.4)';
     ctx.fillRect(col * CELL, row * CELL, CELL, CELL);
-    const c = cellCenter(col, row);
-    drawRange(c.x, c.y, TOWERS[ui.placing].range * CELL, ok);
+    const ghost = newTower(ui.placing, col, row);
+    if (ghost.def.fixedDir) drawBeamLine(ghost, ok);
+    else drawRange(ghost.x, ghost.y, ghost.range, ok);
     ctx.globalAlpha = 0.55;
-    new Tower(ui.placing, col, row).draw(ctx);
+    ghost.draw(ctx);
     ctx.globalAlpha = 1;
   }
 
-  if (ui.selected) drawRange(ui.selected.x, ui.selected.y, ui.selected.range, true);
+  if (ui.selected) {
+    if (ui.selected.def.fixedDir) drawBeamLine(ui.selected, true);
+    else drawRange(ui.selected.x, ui.selected.y, ui.selected.range, true);
+  }
 
   for (const t of game.towers) t.draw(ctx);
   for (const e of game.enemies) e.draw(ctx);

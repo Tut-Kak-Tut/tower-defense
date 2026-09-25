@@ -29,7 +29,8 @@ const SELL_REFUND = 0.6;      // при продажу повертається 
 // range і splash — у клітинках, rate — секунд між атаками.
 // attack: 'projectile' (за замовчуванням) | 'aura' (б'є всіх у радіусі) | 'beam' (промінь крізь усіх на лінії).
 // Необов'язкові механіки: splash, slow/slowTime, poison (урон/с крізь броню)/poisonTime,
-// chain (скільки разів перестрибує)/chainRange, stun (с)/stunChance, detect (бачить невидимих).
+// chain (скільки разів перестрибує)/chainRange, stun (с)/stunChance, detect (бачить невидимих),
+// fixedDir (промінь б'є лише в обраний гравцем бік світу, а не в ціль), beamWidth (півширина променя, кл.).
 const TOWERS = {
   archer: {
     name: 'Скелет-лучник', color: '#e8dcc0', cost: 50,
@@ -38,7 +39,7 @@ const TOWERS = {
   },
   cannon: {
     name: 'Вогняний імп', color: '#ff7a2f', cost: 100,
-    damage: 35, range: 2.5, rate: 1.6, projSpeed: 300, splash: 1.2,
+    damage: 22, range: 2.5, rate: 1.6, projSpeed: 300, splash: 1,
     desc: 'Повільний фаєрбол, вибух по площі',
   },
   frost: {
@@ -62,9 +63,9 @@ const TOWERS = {
     desc: 'Блискавка перестрибує між авантюристами (−25% за стрибок)',
   },
   eye: {
-    name: 'Око-спостерігач', color: '#ff4d6d', cost: 175, attack: 'beam',
-    damage: 30, range: 4, rate: 1.8, detect: true,
-    desc: 'Промінь пробиває всіх на лінії, підсвічує невидимих для всіх',
+    name: 'Біхолдер', color: '#ff4d6d', cost: 175, attack: 'beam', fixedDir: true, beamWidth: 1,
+    damage: 30, range: 5, rate: 1.5, detect: true,
+    desc: 'Промінь у вибраний бік (↑↓←→) пробиває всіх на лінії, підсвічує невидимих',
   },
 };
 

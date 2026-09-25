@@ -131,6 +131,9 @@ $('speedBtn').addEventListener('click', () => { game.speed = game.speed % 3 + 1;
 $('autoBtn').addEventListener('click', toggleAuto);
 $('pauseBtn').addEventListener('click', () => { game.paused = !game.paused; });
 $('upgradeBtn').addEventListener('click', () => { if (ui.selected) upgradeTower(ui.selected); });
+document.querySelectorAll('#dirPad button').forEach(b => b.addEventListener('click', () => {
+  if (ui.selected && ui.selected.def.fixedDir) ui.selected.setDir(+b.dataset.dir);
+}));
 $('sellBtn').addEventListener('click', () => {
   if (ui.selected) { sellTower(ui.selected); ui.selected = null; }
 });
@@ -153,6 +156,7 @@ document.addEventListener('keydown', e => {
   else if (e.key === ' ') { e.preventDefault(); if (!game.over) game.paused = !game.paused; }
   else if (e.key === 'Enter') { e.preventDefault(); startWave(); }
   else if (e.code === 'KeyA') toggleAuto(); // за кодом клавіші — працює і в українській розкладці
+  else if (e.code === 'KeyR' && ui.selected && ui.selected.def.fixedDir) ui.selected.setDir(ui.selected.dir + 1);
 });
 
 // ---------- панель набігу ----------
@@ -275,7 +279,7 @@ function refreshUpgrade() {
     if (def.poison) stat('Отрута', s => `${Math.round(s.poison)}/с · ${def.poisonTime}с`);
     if (def.chain) stat('Стрибків', s => s.chain);
     if (def.stun) stat('Оглушення', s => `${Math.round(s.stunChance * 100)}% · ${def.stun}с`);
-    if (def.attack === 'beam') fixed('Промінь', 'крізь усіх');
+    if (def.attack === 'beam') fixed('Промінь', def.fixedDir ? 'крізь усіх, у свій бік' : 'крізь усіх');
     if (def.detect) fixed('Підсвічує невидимих', 'так');
 
     $('upStats').innerHTML = rows.map(([label, a, b]) => {
@@ -283,6 +287,11 @@ function refreshUpgrade() {
       const cls = String(a) === String(b) ? 'same' : 'next';
       return `<tr><td>${label}</td><td>${a}</td><td class="arrow">→</td><td class="${cls}">${b}</td></tr>`;
     }).join('');
+  }
+
+  $('dirPad').classList.toggle('hidden', !t.def.fixedDir);
+  if (t.def.fixedDir) {
+    document.querySelectorAll('#dirPad button').forEach(b => b.classList.toggle('on', +b.dataset.dir === t.dir));
   }
 
   const up = $('upgradeBtn');

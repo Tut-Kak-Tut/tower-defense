@@ -232,6 +232,10 @@ button.tab.active {
 #upStats .next { color: #8fe38a; font-weight: 700; }
 #upStats .same { color: var(--muted); }
 #upStats .max { color: #c9a0ff; }
+#dirPad { display: flex; align-items: center; gap: 4px; margin-top: 6px; }
+#dirPad .dir-label { flex: 1; font-size: 13px; color: var(--muted); }
+#dirPad button { width: 34px; margin: 0; padding: 4px 0; font-size: 15px; }
+#dirPad button.on { border-color: #ff4d6d; color: #ffd0d8; box-shadow: 0 0 8px rgba(255, 77, 109, 0.45); }
 
 button {
   width: 100%;
