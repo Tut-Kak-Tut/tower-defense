@@ -279,7 +279,7 @@ function refreshUpgrade() {
     if (def.poison) stat('Отрута', s => `${Math.round(s.poison)}/с · ${def.poisonTime}с`);
     if (def.chain) stat('Стрибків', s => s.chain);
     if (def.stun) stat('Оглушення', s => `${Math.round(s.stunChance * 100)}% · ${def.stun}с`);
-    if (def.attack === 'beam') fixed('Промінь', def.fixedDir ? 'крізь усіх, у свій бік' : 'крізь усіх');
+    if (def.attack === 'beam') fixed('Промінь', def.fixedDir ? 'смуга' : 'крізь усіх');
     if (def.detect) fixed('Підсвічує невидимих', 'так');
 
     $('upStats').innerHTML = rows.map(([label, a, b]) => {
