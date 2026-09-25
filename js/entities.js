@@ -36,13 +36,14 @@ const DIRS = [
 const PATH_PX = PATH_POINTS.map(([c, r]) => cellCenter(c, r));
 
 class Enemy {
-  constructor(type, hpMul, rewardMul = 1) {
+  constructor(type, hpMul, rewardMul = 1, speedMul = 1) {
     const def = ENEMIES[type];
     this.type = type;
     this.def = def;
     this.color = def.color;
     this.radius = def.radius;
-    this.baseSpeed = def.speed;
+    this.baseSpeed = def.speed * speedMul;
+    this.leader = null;   // хто йде попереду в загоні — його не обганяємо
     this.reward = Math.round(def.reward * rewardMul);
     this.maxHp = Math.round(def.hp * hpMul);
     this.hp = this.maxHp;
@@ -50,6 +51,7 @@ class Enemy {
     this.armor = (def.armor || 0) * (1 + (hpMul - 1) * 0.25);
     this.maxShield = Math.round(this.maxHp * (def.shield || 0));
     this.shield = this.maxShield;
+    this.sinceHit = 0;    // секунди від останнього удару — для відновлення щита
     this.lifeDmg = def.lifeDmg || 1;
     this.stealth = !!def.stealth;
     this.revealed = 0;    // секунди, поки невидимого підсвічує монстр із detect
@@ -72,6 +74,10 @@ class Enemy {
 
   update(dt, game) {
     if (this.revealed > 0) this.revealed -= dt;
+    this.sinceHit += dt;
+    if (this.def.shieldRegen && this.sinceHit >= SHIELD_REGEN_DELAY) {
+      this.shield = Math.min(this.maxShield, this.shield + this.maxShield * this.def.shieldRegen * dt);
+    }
     if (this.slowTimer > 0) {
       this.slowTimer -= dt;
       if (this.slowTimer <= 0) this.slowFactor = 1;
@@ -95,7 +101,14 @@ class Enemy {
       }
     }
     if (this.stunTimer > 0) { this.stunTimer -= dt; return; }
-    let move = this.baseSpeed * this.slowFactor * dt;
+    let speed = this.baseSpeed * this.slowFactor;
+    // стрій: наздогнавши попереднього в загоні, не обганяємо його (загиблого пропускаємо)
+    while (this.leader && !alive(this.leader)) this.leader = this.leader.leader;
+    const lead = this.leader;
+    if (lead && lead.progress - this.progress < FORMATION_GAP) {
+      speed = Math.min(speed, lead.stunTimer > 0 ? 0 : lead.baseSpeed * lead.slowFactor);
+    }
+    let move = speed * dt;
     while (move > 0 && this.wp < PATH_PX.length) {
       const t = PATH_PX[this.wp];
       const dx = t.x - this.x, dy = t.y - this.y;
@@ -115,6 +128,7 @@ class Enemy {
   // pierce — урон крізь броню (отрута)
   hit(damage, pierce = false) {
     if (this.dead) return;
+    this.sinceHit = 0;
     if (!pierce && this.armor) damage = Math.max(damage * 0.2, damage - this.armor);
     if (this.shield > 0) {
       const absorbed = Math.min(this.shield, damage);

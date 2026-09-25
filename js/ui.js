@@ -215,7 +215,7 @@ function refreshRaid() {
 function enemyTraits(def) {
   const t = [];
   if (def.armor) t.push(`броня ${def.armor}`);
-  if (def.shield) t.push(`щит ${Math.round(def.shield * 100)}%`);
+  if (def.shield) t.push(`щит ${Math.round(def.shield * 100)}%${def.shieldRegen ? ' (відновлюється)' : ''}`);
   if (def.slowImmune) t.push('не мерзне');
   if (def.heal) t.push('лікує');
   if (def.stealth) t.push('невидимий');

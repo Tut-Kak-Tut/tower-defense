@@ -33,6 +33,7 @@ function newGame(mode = null) {
     waveActive: false,
     spawnQueue: [],
     spawnTimer: 0,
+    lastInSquad: [],    // останній авантюрист кожного загону — за ним стає наступний
     enemies: [],
     towers: [],
     projectiles: [],
@@ -134,13 +135,16 @@ function startWave() {
   game.wave++;
   const groups = waveGroups(game.wave);
   game.spawnQueue = [];
-  groups.forEach(([type, count, interval], gi) => {
+  let squad = 0;
+  groups.forEach(([type, count, interval, gap], gi) => {
+    if (gap !== undefined && gi > 0) squad++;   // група з паузою починає новий загін
     for (let i = 0; i < count; i++) {
-      // delay — пауза перед появою цього ворога; між групами +1.5с
-      const delay = i === 0 ? (gi === 0 ? 0 : 1.5) : interval;
-      game.spawnQueue.push({ type, delay });
+      // delay — пауза перед появою цього ворога; у продовженні загону пауза = звичайний інтервал
+      const delay = i === 0 ? (gi === 0 ? 0 : gap ?? interval) : interval;
+      game.spawnQueue.push({ type, delay, squad });
     }
   });
+  game.lastInSquad = [];
   game.spawnTimer = game.spawnQueue[0].delay;
   game.waveActive = true;
 }
@@ -154,11 +158,14 @@ function update(dt) {
   // поява ворогів
   if (game.spawnQueue.length) {
     game.spawnTimer -= dt;
-    const hp = hpMul(game.wave), reward = rewardMul(game.wave);
+    const hp = hpMul(game.wave), reward = rewardMul(game.wave), speed = speedMul(game.wave);
     while (game.spawnQueue.length && game.spawnTimer <= 0) {
       const s = game.spawnQueue.shift();
       game.seen.add(s.type);
-      game.enemies.push(new Enemy(s.type, hp, reward));
+      const e = new Enemy(s.type, hp, reward, speed);
+      e.leader = game.lastInSquad[s.squad] || null;   // іде за попереднім у своєму загоні
+      game.lastInSquad[s.squad] = e;
+      game.enemies.push(e);
       if (game.spawnQueue.length) game.spawnTimer += game.spawnQueue[0].delay;
     }
   }

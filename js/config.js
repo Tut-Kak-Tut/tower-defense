@@ -73,11 +73,15 @@ const TOWERS = {
 // Необов'язкові механіки:
 //   armor      — віднімається від кожного удару (але лишається щонайменше 20% урону); отрута ігнорує броню
 //   shield     — частка maxHp, яку спершу поглинає магічний щит
+//   shieldRegen — частка щита за секунду, що відновлюється, поки авантюриста SHIELD_REGEN_DELAY с не били
+//                 (отрута теж «б'є» — тому павук добре знімає магів)
 //   slowImmune — холод привида не діє
 //   heal       — лікує себе й сусідів: radius (кл.), amount (частка maxHp), every (с)
 //   stealth    — невидимий: б'ють лише монстри з detect, або всі, поки він у радіусі такого монстра
 //   lifeDmg    — скільки міцності Серця знімає при прориві (за замовчуванням 1)
 //   boss       — велика смужка HP
+const SHIELD_REGEN_DELAY = 2;
+const FORMATION_GAP = 26;     // px: наздогнавши попереднього в загоні, авантюрист іде його кроком
 const ENEMIES = {
   normal: { name: 'Воїн',    color: '#b0b8c4', hp: 40,  speed: 60,  reward: 5,  radius: 10,
             desc: 'Надійний шукач пригод, середній у всьому' },
@@ -90,9 +94,9 @@ const ENEMIES = {
   priest: { name: 'Жрець',   color: '#e8e0d0', hp: 60,  speed: 50,  reward: 10, radius: 10,
             heal: { radius: 1.5, amount: 0.06, every: 2 },
             desc: 'Молитвою лікує себе й усіх поруч — убивай першим' },
-  mage:   { name: 'Бойовий маг', color: '#5a3fa0', hp: 55, speed: 55, reward: 10, radius: 10,
-            shield: 0.5, slowImmune: true,
-            desc: 'Магічний щит поглинає урон, холод на нього не діє' },
+  mage:   { name: 'Бойовий маг', color: '#5a3fa0', hp: 80, speed: 55, reward: 12, radius: 10,
+            shield: 0.6, shieldRegen: 0.12, slowImmune: true,
+            desc: 'Магічний щит поглинає урон і відновлюється, якщо мага 2 с не били; холод на нього не діє' },
   scout:  { name: 'Ельф-розвідник', color: '#3f6f5a', hp: 35, speed: 120, reward: 8, radius: 8, stealth: true,
             desc: 'Невидимий: його видно лише поруч із привидом чи оком' },
   knight: { name: 'Вершник', color: '#9aa4b0', hp: 180, speed: 85,  reward: 18, radius: 14, armor: 2, lifeDmg: 2,
@@ -103,32 +107,49 @@ const ENEMIES = {
 };
 
 // ---------- набіги ----------
-// Набіг — список груп [тип, кількість, інтервал між ворогами в секундах]. Групи йдуть одна за одною.
+// Набіг — список груп [тип, кількість, інтервал між ворогами в секундах, пауза?]. Групи йдуть одна за одною.
+// Група з паузою (4-й елемент) починає новий загін; група без паузи — продовження загону одразу за попередньою.
+// У загоні ніхто не обганяє того, хто йде попереду (Enemy.leader), тож стрій тримається: авангард веде решту.
 
 const CAMPAIGN_WAVES = 100;   // у безкінечному режимі генератор просто продовжує далі
 
-// Перші набіги — ручні, щоб навчити гравця; 10-й — перший бос.
+// Перші набіги — ручні, щоб навчити гравця; 10-й — перший бос зі свитою.
 const FIRST_WAVES = [
-  [['normal', 8, 1]],
-  [['normal', 12, 0.8]],
-  [['normal', 8, 0.8], ['fast', 6, 0.6]],
-  [['fast', 12, 0.5]],
-  [['normal', 10, 0.7], ['tank', 2, 2]],
-  [['tank', 4, 1.5], ['fast', 10, 0.4]],
-  [['normal', 12, 0.5], ['tank', 3, 1.5]],
-  [['fast', 16, 0.3], ['tank', 3, 1.2]],
-  [['tank', 6, 1], ['normal', 14, 0.4]],
-  [['normal', 10, 0.5], ['hero', 1, 1]],
+  [['normal', 4, 0.9], ['normal', 4, 0.9, 3]],
+  [['normal', 4, 0.8], ['normal', 4, 0.8, 2.5], ['normal', 4, 0.8, 2.5]],
+  [['normal', 4, 0.8], ['fast', 3, 0.5, 2.5], ['normal', 4, 0.8, 2.5], ['fast', 3, 0.5, 2.5]],
+  [['fast', 4, 0.45], ['fast', 4, 0.45, 2.5], ['fast', 4, 0.45, 2.5]],
+  [['normal', 4, 0.7], ['tank', 1, 1, 3], ['normal', 3, 0.7], ['tank', 1, 1, 3], ['normal', 3, 0.7]],
+  [['fast', 5, 0.4], ['tank', 2, 1.5, 2.5], ['normal', 3, 0.7], ['fast', 5, 0.4, 2.5]],
+  [['tank', 1, 1], ['normal', 4, 0.5], ['tank', 1, 1, 2.5], ['normal', 4, 0.5], ['tank', 1, 1, 2.5], ['normal', 4, 0.5]],
+  [['fast', 8, 0.3], ['tank', 2, 1.2, 2.5], ['normal', 3, 0.5], ['fast', 8, 0.3, 2.5], ['tank', 1, 1, 2.5]],
+  [['tank', 2, 1], ['normal', 7, 0.4], ['tank', 2, 1, 2.5], ['normal', 7, 0.4], ['tank', 2, 1, 2.5]],
+  [['normal', 5, 0.5], ['normal', 5, 0.5, 2.5], ['tank', 1, 1, 3], ['hero', 1, 1], ['normal', 3, 0.5]],
 ];
 
 // З якого набігу тип з'являється в генерованих набігах.
 // Не на кратних 5 — там тематичні й бос-набіги, а новачок має з'явитися у звичайному набігу першим.
 const ENEMY_UNLOCK = { normal: 1, fast: 3, tank: 5, gnome: 11, priest: 14, mage: 18, scout: 23, knight: 27 };
-// Скільки таких у групі на «розмірі набігу» 1 і базовий інтервал появи.
-const WAVE_BASE = {
-  normal: [8, 0.7], fast: [8, 0.45], tank: [2, 1.5], gnome: [4, 1.0],
-  priest: [2, 1.6], mage: [3, 1.0], scout: [3, 0.7], knight: [2, 1.3], hero: [1, 3],
+// Інтервал появи всередині групи (с) до скорочення з набігами.
+const SPAWN_GAP = {
+  normal: 0.7, fast: 0.45, tank: 1.3, gnome: 1.0, priest: 1.0, mage: 1.0, scout: 0.6, knight: 1.2, hero: 2,
 };
+
+// Шаблони загонів у порядку строю: авангард (паладин/гном/вершник) → основа (воїни) → тил (жрець/маг).
+// Злодії й розвідники — окремі швидкі зграйки. Кількості — на «розмірі набігу» 1.
+// Загін доступний, коли відкриті всі його типи.
+const SQUADS = [
+  { name: 'Патруль',           units: [['normal', 4]] },
+  { name: 'Злодійська зграя',  units: [['fast', 4]] },
+  { name: 'Паладин із загоном', units: [['tank', 1], ['normal', 3]] },
+  { name: 'Гномий клин',       units: [['gnome', 2], ['normal', 2]] },
+  { name: 'Хрестовий похід',   units: [['tank', 1], ['normal', 2], ['priest', 1]] },
+  { name: 'Бойова партія',     units: [['gnome', 1], ['normal', 2], ['mage', 1]] },
+  { name: 'Класична партія',   units: [['tank', 1], ['fast', 1], ['mage', 1], ['priest', 1]] },
+  { name: 'Тіньова група',     units: [['scout', 2], ['fast', 2]] },
+  { name: 'Кавалерійський наскок', units: [['knight', 2], ['scout', 1]] },
+  { name: 'Велика експедиція', units: [['knight', 1], ['gnome', 1], ['normal', 2], ['mage', 1], ['priest', 1]] },
+];
 
 // Детермінований «рандом» 0..1 від чисел — і для візерунку мапи, і для складу набігів
 // (склад має бути однаковим щоразу, бо панель показує його наперед).
@@ -138,35 +159,62 @@ function hash(a, b, seed = 0) {
   return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
 }
 
+// «Розмір набігу»: швидко росте до 38-го, далі повільніше, але без стелі — інакше пізні набіги стають легкими.
+const waveSize = n => n <= 38 ? 1 + n * 0.08 : 4.04 + (n - 38) * 0.03;
+const squadMass = s => s.units.reduce((m, [t, c]) => m + ENEMIES[t].hp * c, 0);
+
 // Склад набігу n (з 1).
 function waveGroups(n) {
   if (n <= FIRST_WAVES.length) return FIRST_WAVES[n - 1];
   const rnd = i => hash(n, i, 7);
-  const pool = Object.keys(ENEMY_UNLOCK).filter(t => ENEMY_UNLOCK[t] <= n);
+  const open = t => ENEMY_UNLOCK[t] <= n;
+  const pool = SQUADS.filter(s => s.units.every(([t]) => open(t)));
   const pick = i => pool[Math.floor(rnd(i) * pool.length)];
-  const size = Math.min(1 + n * 0.08, 4);                // кількість росте до ~38-го набігу, далі — лише сила
-  const fast = 1 - Math.min(0.5, n * 0.005);             // інтервали скорочуються до половини
-  const group = (t, mul = 1) => [t, Math.max(1, Math.round(WAVE_BASE[t][0] * size * mul)), +(WAVE_BASE[t][1] * fast).toFixed(2)];
+  const size = waveSize(n);
+  const sq = 1 + (size - 1) * 0.4;                        // загони більшають повільніше, ніж їх кількість
+  const fast = 1 - Math.min(0.6, n * 0.005);              // інтервали скорочуються до 0.4
+  const gap = +(2.5 * fast).toFixed(2);                   // пауза між загонами
+  const groups = [];
+  const add = (units, mul = 1) => units.forEach(([t, c], i) => {
+    const count = t === 'hero' ? c : Math.max(1, Math.round(c * sq * mul));  // героїв не множимо
+    const g = [t, count, +(SPAWN_GAP[t] * fast).toFixed(2)];
+    if (i === 0) g.push(gap);
+    groups.push(g);
+  });
 
   if (n % 10 === 0) {
-    // бос-набіг: свита, потім герої (+1 кожні 40 набігів)
-    return [group(pick(1)), ['hero', 1 + Math.floor(n / 40), WAVE_BASE.hero[1]]];
+    // бос-набіг: два загони попереду, далі герой в оточенні — авангард веде, тил лікує/прикриває
+    add(pick(1).units);
+    add(pick(2).units);
+    const guard = open('knight') ? 'knight' : open('gnome') ? 'gnome' : 'tank';
+    const rear = ['priest', 'mage'].filter(open);
+    add([[guard, 1], ['hero', 1 + Math.floor(n / 40)], ...rear.map(t => [t, 1])]);
+    return groups;
   }
+  const budget = 600 * size;                              // сумарне базове HP набігу
+  let mass = 0;
   if (n % 5 === 0) {
-    // тематичний набіг — натовп одного типу
-    return [group(pick(1), 1.8)];
+    // тематичний набіг — той самий загін раз за разом
+    const s = pick(1);
+    for (let i = 0; mass < budget && i < 10; i++) { add(s.units, 0.8); mass += squadMass(s) * sq * 0.8; }
+    return groups;
   }
-  // щойно відкритий тип іде першим невеликою групою, щоб гравець його помітив і встиг відреагувати
-  const fresh = pool.find(t => ENEMY_UNLOCK[t] === n);
-  const count = 2 + (rnd(2) < 0.35 + n * 0.004 ? 1 : 0);
-  const types = fresh ? [fresh] : [];
-  for (let i = 0; types.length < count && i < 20; i++) {
-    const t = pick(10 + i);
-    if (!types.includes(t)) types.push(t);
+  // щойно відкритий тип приходить першим — у невеликому загоні, де він на своєму місці в строю
+  const fresh = Object.keys(ENEMY_UNLOCK).find(t => ENEMY_UNLOCK[t] === n);
+  if (fresh) {
+    const intro = pool.find(s => s.units.some(([t]) => t === fresh));
+    add(intro.units, 0.6);
+    mass += squadMass(intro) * sq * 0.6;
   }
-  return types.map(t => group(t, t === fresh ? 0.5 : 1));
+  for (let i = 0; (mass < budget || groups.length < 2) && i < 12; i++) {
+    const s = pick(10 + i);
+    add(s.units);
+    mass += squadMass(s) * sq;
+  }
+  return groups;
 }
 
 // Множники сили й нагороди авантюристів на набігу n.
 const hpMul = n => 1 + 0.12 * (n - 1) + 0.0022 * (n - 1) ** 2;
 const rewardMul = n => 1 + 0.02 * (n - 1);
+const speedMul = n => 1;
