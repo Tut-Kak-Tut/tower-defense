@@ -299,17 +299,17 @@ function refreshUpgrade() {
     const web = def.attack === 'web';
     $('upDesc').textContent = maxed
       ? `${def.desc}. Монстр досяг найвищого рівня.`
-      : web ? `${def.desc}. Посилення: павутина тримає міцніше, отрута сильніша, радіус трохи ширший.`
+      : web ? `${def.desc}. Посилення: павутина тримає довше, летить далі, постріли частіші.`
       : `${def.desc}. Посилення: урон +${Math.round(((def.dmgLvl || LVL_DMG) - 1) * 100)}%, ` +
         `дальність +${LVL_RANGE} кл., атака на ${Math.round((1 - LVL_RATE) * 100)}% частіше.`;
 
     const now = towerStats(def, t.level);
     const next = maxed ? null : towerStats(def, t.level + 1);
     const rows = web ? [
-      ['Павутина', now.range.toFixed(2) + ' кл.', next && next.range.toFixed(2) + ' кл.'],
-      ['Сповільнення', Math.round((1 - now.slow) * 100) + '%', next && Math.round((1 - next.slow) * 100) + '%'],
-      ['Отрута', `${now.poison}/с + ${(now.poisonPct * 100).toFixed(2)}% HP/с`,
-        next && `${next.poison}/с + ${(next.poisonPct * 100).toFixed(2)}% HP/с`],
+      ['Утримання', now.hold.toFixed(1) + 'с', next && next.hold.toFixed(1) + 'с'],
+      ['Дальність', now.range.toFixed(2) + ' кл.', next && next.range.toFixed(2) + ' кл.'],
+      ['Перезарядка', now.rate.toFixed(2) + 'с', next && next.rate.toFixed(2) + 'с'],
+      ['Конус', def.cone + '°', def.cone + '°'],
     ] : [
       ['Урон', Math.round(now.damage), next && Math.round(next.damage)],
       ['Дальність', now.range.toFixed(2), next && next.range.toFixed(2)],

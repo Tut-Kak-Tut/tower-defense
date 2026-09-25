@@ -9,12 +9,12 @@ function cellCenter(col, row) {
 function towerStats(def, level) {
   const l = level - 1;
   if (def.attack === 'web') {
-    // павутина: росте лише сповільнення (менше slow = сильніше) і трохи радіус, отрута стала
+    // павутина конусом: без урону, ростуть утримання, дальність і частота пострілів
     return {
-      damage: 0, rate: 0, poison: def.poison, poisonPct: def.poisonPct + def.poisonPctLvl * l,
+      damage: 0, poison: 0, slow: 0, frail: 0, stunChance: 0, chain: 0,
+      rate: def.rate * Math.pow(LVL_RATE, l),
       range: def.range + def.webRangeLvl * l,
-      slow: Math.max(0.2, def.slow - def.webSlowLvl * l),
-      stunChance: 0, chain: 0,
+      hold: def.hold + def.holdLvl * l,
     };
   }
   return {
@@ -37,7 +37,6 @@ function segDist(px, py, x1, y1, x2, y2) {
 }
 
 const alive = e => !e.dead && !e.escaped;
-const WEB_LINGER = 0.4; // с: павутина ще тримає, коли авантюрист із неї вибрався
 
 // Сторони світу для променя біхолдера: індекс = tower.dir, кут = dir * π/2.
 const DIRS = [
@@ -75,6 +74,7 @@ class Enemy {
     this.slowFactor = 1;
     this.slowTimer = 0;
     this.stunTimer = 0;
+    this.webbed = false;   // стоїть через павутину павука (кокон замість зірочок)
     this.poisonDps = 0;
     this.poisonTimer = 0;
     this.poisonSrc = null; // чия отрута — для статистики
@@ -176,9 +176,12 @@ class Enemy {
     this.frailTimer = Math.max(this.frailTimer, time);
   }
 
-  stun(time) {
+  stun(time, webbed = false) {
     // боса оглушення тримає вдвічі коротше
-    this.stunTimer = Math.max(this.stunTimer, this.def.boss ? time / 2 : time);
+    const t = this.def.boss ? time / 2 : time;
+    if (t < this.stunTimer) return;
+    this.stunTimer = t;
+    this.webbed = webbed;
   }
 
   poison(dps, time, src = null) {
@@ -224,7 +227,26 @@ class Enemy {
       }
     }
 
-    if (this.stunTimer > 0) {
+    if (this.stunTimer > 0 && this.webbed) {
+      // павутина — білясті нитки навхрест поверх фігурки, що ледь тремтять
+      ctx.save();
+      ctx.translate(this.x, this.y);
+      ctx.strokeStyle = 'rgba(235, 245, 225, 0.75)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      for (let i = 0; i < 4; i++) {
+        const a = i * Math.PI / 4 + Math.sin(time * 3 + this.progress) * 0.05;
+        const c = Math.cos(a) * (r + 3), s = Math.sin(a) * (r + 3);
+        ctx.moveTo(-c, -s); ctx.lineTo(c, s);
+      }
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(0, 0, r + 1, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(220, 235, 210, 0.18)';
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+    } else if (this.stunTimer > 0) {
       // оглушення — зірочки навколо голови
       ctx.fillStyle = '#ffe066';
       for (let i = 0; i < 3; i++) {
@@ -271,7 +293,6 @@ class Tower {
     this.level = 1;
     this.spent = this.def.cost;
     this.cooldown = 0;
-    this.born = time; // коли з'явився — павутина розгортається від цього моменту
     this.angle = -Math.PI / 2;
     if (this.def.fixedDir) this.setDir(3);
   }
@@ -313,7 +334,6 @@ class Tower {
         if (e.stealth && this.reaches(e)) e.revealed = 0.3;
       }
     }
-    if (this.def.attack === 'web') { this.web(game); return; }
     this.cooldown -= dt;
     if (this.cooldown > 0) return;
     let target = null;
@@ -328,6 +348,7 @@ class Tower {
     const attack = this.def.attack || 'projectile';
     if (attack === 'aura') this.stomp(game, s);
     else if (attack === 'beam') this.beam(game, s);
+    else if (attack === 'web') this.web(game, s);
     else game.projectiles.push(new Projectile(this, target));
     this.cooldown = s.rate;
   }
@@ -343,15 +364,21 @@ class Tower {
     game.effects.push({ kind: 'quake', x: this.x, y: this.y, r: rad, t: 0.35, max: 0.35, color: this.def.color });
   }
 
-  // павук: постійна павутина навколо себе — кожного, хто в ній (і невидимих теж), сповільнює й труїть,
-  // ефект тримається ще WEB_LINGER с після виходу з павутини
-  web(game) {
-    const s = towerStats(this.def, this.level), rad = s.range * CELL;
+  // павук: павутина конусом у бік angle — усі в конусі (і невидимі теж) застрягають на hold с
+  web(game, s) {
+    const len = s.range * CELL, half = this.def.cone * Math.PI / 360;
     for (const e of game.enemies) {
-      if (!alive(e) || Math.hypot(e.x - this.x, e.y - this.y) > rad + e.radius) continue;
-      e.slow(s.slow, WEB_LINGER);
-      e.poison(s.poison + e.maxHp * s.poisonPct, WEB_LINGER, this.type);
+      if (!alive(e)) continue;
+      const dx = e.x - this.x, dy = e.y - this.y, d = Math.hypot(dx, dy);
+      if (d > len + e.radius) continue;
+      // кут до цілі з поправкою на її розмір, щоб край конуса чіпляв і тих, хто лише зачепився
+      let da = Math.abs(Math.atan2(dy, dx) - this.angle);
+      if (da > Math.PI) da = Math.PI * 2 - da;
+      if (d > e.radius && da > half + Math.asin(Math.min(1, e.radius / d))) continue;
+      e.stun(s.hold, true);
     }
+    game.effects.push({ kind: 'cone', x: this.x, y: this.y, r: len, a: this.angle, half,
+      t: 0.4, max: 0.4, color: this.def.color });
   }
 
   // біхолдер: промінь на всю дальність у напрямку angle (для fixedDir — обраний бік світу)

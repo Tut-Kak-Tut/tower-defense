@@ -29,9 +29,9 @@ const MAX_TOWERS = 18;        // скільки монстрів може жит
 
 // range і splash — у клітинках, rate — секунд між атаками.
 // attack: 'projectile' (за замовчуванням) | 'aura' (б'є всіх у радіусі) | 'beam' (промінь крізь усіх на лінії)
-//         | 'web' (павук один раз плете павутину навколо себе; поки він стоїть, усі в ній сповільнені
-//           й отруєні: poison/с + poisonPct від maxHp за секунду. З рівнем ростуть сповільнення (webSlowLvl),
-//           радіус (webRangeLvl) і частка отрути (poisonPctLvl)).
+//         | 'web' (павук раз на rate с стріляє павутиною в конус перед собою: кут cone (градусів, повний),
+//           дальність range; усі в конусі стоять на місці hold с (бос — вдвічі менше), без урону.
+//           З рівнем ростуть утримання (holdLvl), дальність (webRangeLvl) і частота (LVL_RATE)).
 // Необов'язкові механіки: splash, slow/slowTime, poison (урон/с крізь броню)/poisonTime,
 // chain (скільки разів перестрибує)/chainRange, stun (с)/stunChance, detect (бачить невидимих),
 // slowLvl (сповільнення міцнішає з рівнем), frail/frailLvl (ціль отримує +frail урону від усіх, поки сповільнена),
@@ -55,9 +55,8 @@ const TOWERS = {
   },
   spider: {
     name: 'Печерний павук', color: '#8fd14f', cost: 80,
-    attack: 'web', damage: 0, range: 1.6, rate: 0, poison: 2, poisonPct: 0.008, poisonPctLvl: 0.0008,
-    slow: 0.65, webSlowLvl: 0.035, webRangeLvl: 0.06,
-    desc: 'Обплітає павутиною все навколо себе: у ній авантюристи вгрузають і труяться (крізь броню, частка від їхнього здоров’я)',
+    attack: 'web', damage: 0, range: 2.5, rate: 4, cone: 60, hold: 1.5, holdLvl: 0.1, webRangeLvl: 0.1,
+    desc: 'Стріляє павутиною в конус перед собою: усі, кого зачепило, застрягають на місці',
   },
   golem: {
     name: 'Кам’яний голем', color: '#a89a86', cost: 120, attack: 'aura',
