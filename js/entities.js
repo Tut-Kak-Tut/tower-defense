@@ -8,11 +8,21 @@ function cellCenter(col, row) {
 // range — у клітинках, rate — секунд між атаками.
 function towerStats(def, level) {
   const l = level - 1;
+  if (def.attack === 'web') {
+    // павутина: росте лише сповільнення (менше slow = сильніше) і трохи радіус, отрута стала
+    return {
+      damage: 0, rate: 0, poison: def.poison,
+      range: def.range + def.webRangeLvl * l,
+      slow: Math.max(0.2, def.slow - def.webSlowLvl * l),
+      stunChance: 0, chain: 0,
+    };
+  }
   return {
     damage: def.damage * Math.pow(LVL_DMG, l),
     range: def.range + LVL_RANGE * l,
     rate: def.rate * Math.pow(LVL_RATE, l),
     poison: (def.poison || 0) * Math.pow(LVL_DMG, l),
+    slow: def.slow || 0,
     stunChance: def.stunChance ? Math.min(0.8, def.stunChance + 0.04 * l) : 0,
     chain: def.chain ? def.chain + Math.floor(l / 3) : 0,
   };
@@ -26,6 +36,7 @@ function segDist(px, py, x1, y1, x2, y2) {
 }
 
 const alive = e => !e.dead && !e.escaped;
+const WEB_LINGER = 0.4; // с: павутина ще тримає, коли авантюрист із неї вибрався
 
 // Сторони світу для променя біхолдера: індекс = tower.dir, кут = dir * π/2.
 const DIRS = [
@@ -250,6 +261,7 @@ class Tower {
     this.level = 1;
     this.spent = this.def.cost;
     this.cooldown = 0;
+    this.born = time; // коли з'явився — павутина розгортається від цього моменту
     this.angle = -Math.PI / 2;
     if (this.def.fixedDir) this.setDir(3);
   }
@@ -291,6 +303,7 @@ class Tower {
         if (e.stealth && this.reaches(e)) e.revealed = 0.3;
       }
     }
+    if (this.def.attack === 'web') { this.web(game); return; }
     this.cooldown -= dt;
     if (this.cooldown > 0) return;
     let target = null;
@@ -305,7 +318,6 @@ class Tower {
     const attack = this.def.attack || 'projectile';
     if (attack === 'aura') this.stomp(game, s);
     else if (attack === 'beam') this.beam(game, s);
-    else if (attack === 'web') this.web(game, s);
     else game.projectiles.push(new Projectile(this, target));
     this.cooldown = s.rate;
   }
@@ -321,16 +333,15 @@ class Tower {
     game.effects.push({ kind: 'quake', x: this.x, y: this.y, r: rad, t: 0.35, max: 0.35, color: this.def.color });
   }
 
-  // павук: павутина на всіх видимих поруч — урон, сповільнення, отрута
-  web(game, s) {
-    const rad = s.range * CELL;
+  // павук: постійна павутина навколо себе — кожного, хто в ній (і невидимих теж), сповільнює й труїть,
+  // ефект тримається ще WEB_LINGER с після виходу з павутини
+  web(game) {
+    const s = towerStats(this.def, this.level), rad = s.range * CELL;
     for (const e of game.enemies) {
-      if (!alive(e) || e.hidden || Math.hypot(e.x - this.x, e.y - this.y) > rad + e.radius) continue;
-      e.hit(s.damage, false, this.type);
-      e.slow(this.def.slow, this.def.slowTime);
-      e.poison(s.poison, this.def.poisonTime, this.type);
+      if (!alive(e) || Math.hypot(e.x - this.x, e.y - this.y) > rad + e.radius) continue;
+      e.slow(s.slow, WEB_LINGER);
+      e.poison(s.poison, WEB_LINGER, this.type);
     }
-    game.effects.push({ kind: 'web', x: this.x, y: this.y, r: rad, t: 0.5, max: 0.5, rot: Math.random() * Math.PI });
   }
 
   // біхолдер: промінь на всю дальність у напрямку angle (для fixedDir — обраний бік світу)

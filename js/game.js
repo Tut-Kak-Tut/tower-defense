@@ -426,6 +426,40 @@ function drawBeamLine(t, ok) {
   ctx.restore();
 }
 
+// Павутина павука під ним: розгортається за пів секунди після появи й лежить, поки павук стоїть.
+function drawWeb(t) {
+  const grow = Math.min(1, (time - t.born) / 0.5);
+  const r = t.range * (0.3 + 0.7 * grow);
+  ctx.save();
+  ctx.translate(t.x, t.y);
+  ctx.rotate(hash(t.col, t.row) * Math.PI);
+  ctx.globalAlpha = 0.1 + 0.02 * Math.sin(time * 2 + t.col);
+  ctx.fillStyle = '#8fd14f';
+  ctx.beginPath();
+  ctx.arc(0, 0, r, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = '#e6f2d8';
+  ctx.globalAlpha = 0.35;
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  const N = 10;
+  for (let i = 0; i < N; i++) {
+    const a = i * Math.PI * 2 / N;
+    ctx.moveTo(0, 0);
+    ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r);
+  }
+  // кільця — ламаними між нитками, як справжня павутина
+  for (const f of [0.25, 0.45, 0.65, 0.85, 1]) {
+    for (let i = 0; i <= N; i++) {
+      const a = i * Math.PI * 2 / N;
+      const px = Math.cos(a) * r * f, py = Math.sin(a) * r * f;
+      if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+    }
+  }
+  ctx.stroke();
+  ctx.restore();
+}
+
 // Короткі ефекти: fx.t спадає від fx.max до 0.
 function drawEffect(fx) {
   const k = fx.t / fx.max; // 1 → 0
@@ -467,35 +501,6 @@ function drawEffect(fx) {
       ctx.lineTo(b.x, b.y);
     }
     ctx.stroke();
-  } else if (fx.kind === 'web') {
-    // павутина павука: радіальні нитки й кільця розкриваються і тануть
-    const r = fx.r * (1 - k * k * 0.6);
-    ctx.translate(fx.x, fx.y);
-    ctx.rotate(fx.rot);
-    ctx.strokeStyle = '#e6f2d8';
-    ctx.globalAlpha = Math.min(1, k * 1.5) * 0.7;
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    const N = 8;
-    for (let i = 0; i < N; i++) {
-      const a = i * Math.PI * 2 / N;
-      ctx.moveTo(0, 0);
-      ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r);
-    }
-    // кільця — ламаними між нитками, як справжня павутина
-    for (const f of [0.35, 0.65, 0.95]) {
-      for (let i = 0; i <= N; i++) {
-        const a = i * Math.PI * 2 / N;
-        const px = Math.cos(a) * r * f, py = Math.sin(a) * r * f;
-        if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
-      }
-    }
-    ctx.stroke();
-    ctx.globalAlpha = k * 0.12;
-    ctx.fillStyle = '#8fd14f';
-    ctx.beginPath();
-    ctx.arc(0, 0, r, 0, Math.PI * 2);
-    ctx.fill();
   } else if (fx.kind === 'quake') {
     // удар голема: кільце, що розходиться по землі
     ctx.strokeStyle = fx.color;
@@ -538,6 +543,7 @@ function draw() {
     else drawRange(ui.selected.x, ui.selected.y, ui.selected.range, true);
   }
 
+  for (const t of game.towers) if (t.def.attack === 'web') drawWeb(t);
   for (const t of game.towers) t.draw(ctx);
   for (const e of game.enemies) e.draw(ctx);
   for (const p of game.projectiles) p.draw(ctx);

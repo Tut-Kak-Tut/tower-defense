@@ -296,14 +296,20 @@ function refreshUpgrade() {
     const maxed = t.level >= MAX_LEVEL;
     $('upName').textContent = def.name;
     $('upLevel').textContent = '◆'.repeat(t.level) + '◇'.repeat(MAX_LEVEL - t.level) + ` рівень ${t.level}/${MAX_LEVEL}`;
+    const web = def.attack === 'web';
     $('upDesc').textContent = maxed
       ? `${def.desc}. Монстр досяг найвищого рівня.`
+      : web ? `${def.desc}. Посилення: павутина тримає міцніше і трохи ширша.`
       : `${def.desc}. Посилення: урон +${Math.round((LVL_DMG - 1) * 100)}%, ` +
         `дальність +${LVL_RANGE} кл., атака на ${Math.round((1 - LVL_RATE) * 100)}% частіше.`;
 
     const now = towerStats(def, t.level);
     const next = maxed ? null : towerStats(def, t.level + 1);
-    const rows = [
+    const rows = web ? [
+      ['Павутина', now.range.toFixed(2) + ' кл.', next && next.range.toFixed(2) + ' кл.'],
+      ['Сповільнення', Math.round((1 - now.slow) * 100) + '%', next && Math.round((1 - next.slow) * 100) + '%'],
+      ['Отрута', now.poison + '/с', next && next.poison + '/с'],
+    ] : [
       ['Урон', Math.round(now.damage), next && Math.round(next.damage)],
       ['Дальність', now.range.toFixed(2), next && next.range.toFixed(2)],
       ['Атака', now.rate.toFixed(2) + 'с', next && next.rate.toFixed(2) + 'с'],
@@ -312,12 +318,11 @@ function refreshUpgrade() {
     const fixed = (label, v) => rows.push([label, v, v]);
     const stat = (label, f) => rows.push([label, f(now), next && f(next)]);
     if (def.splash) fixed('Вибух', def.splash + ' кл.');
-    if (def.slow) fixed('Сповільнення', `${Math.round((1 - def.slow) * 100)}% · ${def.slowTime}с`);
-    if (def.poison) stat('Отрута', s => `${Math.round(s.poison)}/с · ${def.poisonTime}с`);
+    if (def.slow && !web) fixed('Сповільнення', `${Math.round((1 - def.slow) * 100)}% · ${def.slowTime}с`);
+    if (def.poison && !web) stat('Отрута', s => `${Math.round(s.poison)}/с · ${def.poisonTime}с`);
     if (def.chain) stat('Стрибків', s => s.chain);
     if (def.stun) stat('Оглушення', s => `${Math.round(s.stunChance * 100)}% · ${def.stun}с`);
     if (def.attack === 'beam') fixed('Промінь', def.fixedDir ? 'смуга' : 'крізь усіх');
-    if (def.attack === 'web') fixed('Павутина', 'навколо себе');
     if (def.detect) fixed('Підсвічує невидимих', 'так');
 
     $('upStats').innerHTML = rows.map(([label, a, b]) => {
