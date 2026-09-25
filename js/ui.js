@@ -148,6 +148,42 @@ function toggleAuto() {
   game.autoTimer = AUTO_DELAY;
 }
 
+// ---------- музика: треки по черзі у випадковому порядку, вкл/викл зберігається ----------
+const MUSIC = ['music/cave-theme.ogg', 'music/dungeon.ogg', 'music/battle-theme-a.mp3'];
+const MUSIC_KEY = 'dungeon-heart-music';
+const music = new Audio();
+music.volume = 0.35;
+let musicOn = true;
+try { musicOn = localStorage.getItem(MUSIC_KEY) !== 'off'; } catch { /* лишаємо увімкненою */ }
+let musicTrack = -1;
+
+function nextTrack() {
+  let i;
+  do i = Math.floor(Math.random() * MUSIC.length); while (MUSIC.length > 1 && i === musicTrack);
+  musicTrack = i;
+  music.src = MUSIC[i];
+  if (musicOn) music.play().catch(() => {});
+}
+music.addEventListener('ended', nextTrack);
+
+function toggleMusic() {
+  musicOn = !musicOn;
+  try { localStorage.setItem(MUSIC_KEY, musicOn ? 'on' : 'off'); } catch { /* ігноруємо */ }
+  if (!musicOn) music.pause();
+  else if (musicTrack < 0) nextTrack();
+  else music.play().catch(() => {});
+}
+$('musicBtn').addEventListener('click', toggleMusic);
+
+// браузер не дає грати звук до першої взаємодії — стартуємо на першому кліку чи клавіші
+function startMusicOnce() {
+  document.removeEventListener('pointerdown', startMusicOnce);
+  document.removeEventListener('keydown', startMusicOnce);
+  if (musicOn && musicTrack < 0) nextTrack();
+}
+document.addEventListener('pointerdown', startMusicOnce);
+document.addEventListener('keydown', startMusicOnce);
+
 // ---------- клавіатура ----------
 const towerTypes = Object.keys(TOWERS);
 document.addEventListener('keydown', e => {
@@ -156,6 +192,7 @@ document.addEventListener('keydown', e => {
   else if (e.key === ' ') { e.preventDefault(); if (!game.over) game.paused = !game.paused; }
   else if (e.key === 'Enter') { e.preventDefault(); startWave(); }
   else if (e.code === 'KeyA') toggleAuto(); // за кодом клавіші — працює і в українській розкладці
+  else if (e.code === 'KeyM') toggleMusic();
   else if (e.code === 'KeyR' && ui.selected && ui.selected.def.fixedDir) ui.selected.setDir(ui.selected.dir + 1);
 });
 
@@ -280,6 +317,7 @@ function refreshUpgrade() {
     if (def.chain) stat('Стрибків', s => s.chain);
     if (def.stun) stat('Оглушення', s => `${Math.round(s.stunChance * 100)}% · ${def.stun}с`);
     if (def.attack === 'beam') fixed('Промінь', def.fixedDir ? 'смуга' : 'крізь усіх');
+    if (def.attack === 'web') fixed('Павутина', 'навколо себе');
     if (def.detect) fixed('Підсвічує невидимих', 'так');
 
     $('upStats').innerHTML = rows.map(([label, a, b]) => {
@@ -305,6 +343,40 @@ function refreshUpgrade() {
   $('sellBtn').textContent = `Вигнати (+👻 ${t.sellValue})`;
 }
 
+// ---------- статистика урону за типами монстрів ----------
+const shortNum = n => n >= 1e6 ? (n / 1e6).toFixed(1) + 'M' : n >= 1e4 ? Math.round(n / 1e3) + 'k'
+  : n >= 1e3 ? (n / 1e3).toFixed(1) + 'k' : String(Math.round(n));
+
+let statsKey = null;
+let statsCells = {};  // тип → [клітинка набігу, усього, вбито]
+function refreshStats() {
+  const types = Object.keys(TOWERS).filter(t => game.stats[t]);
+  const key = types.join(',');
+  if (key !== statsKey) {
+    // перебудовуємо DOM лише коли з'явився новий тип (або нова гра)
+    statsKey = key;
+    statsCells = {};
+    const list = $('statsList');
+    list.textContent = '';
+    for (const type of types) {
+      const row = document.createElement('div');
+      row.className = 'st-row';
+      row.title = TOWERS[type].name;
+      row.appendChild(towerIcon(type, 26));
+      const cells = [0, 1, 2].map(() => row.appendChild(document.createElement('span')));
+      statsCells[type] = cells;
+      list.appendChild(row);
+    }
+    $('statsEmpty').classList.toggle('hidden', types.length > 0);
+  }
+  for (const type of types) {
+    const st = game.stats[type], [r, t, k] = statsCells[type];
+    r.textContent = shortNum(st.round);
+    t.textContent = shortNum(st.total);
+    k.textContent = st.kills;
+  }
+}
+
 // ---------- оновлення панелей (кожен кадр) ----------
 function refreshUI() {
   const max = maxWaves();
@@ -325,6 +397,7 @@ function refreshUI() {
   $('paneMonsters').classList.toggle('hidden', ui.tab !== 'monsters');
   $('paneUpgrade').classList.toggle('hidden', ui.tab !== 'upgrade');
   refreshUpgrade();
+  refreshStats();
 
   const waveBtn = $('waveBtn');
   waveBtn.disabled = game.waveActive || !!game.over;
@@ -336,6 +409,8 @@ function refreshUI() {
   $('autoBtn').textContent = game.auto ? '🔁 Авто: так' : '🔁 Авто: ні';
   $('autoBtn').classList.toggle('on', game.auto);
   $('pauseBtn').textContent = game.paused ? '▶ Далі' : '⏸ Пауза';
+  $('musicBtn').textContent = musicOn ? '🔊' : '🔇';
+  $('musicBtn').classList.toggle('on', musicOn);
 
   refreshOverlay();
 }

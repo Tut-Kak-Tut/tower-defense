@@ -65,6 +65,7 @@ class Enemy {
     this.stunTimer = 0;
     this.poisonDps = 0;
     this.poisonTimer = 0;
+    this.poisonSrc = null; // чия отрута — для статистики
     this.dir = 0;
     this.dead = false;
     this.escaped = false;
@@ -84,7 +85,7 @@ class Enemy {
     }
     if (this.poisonTimer > 0) {
       this.poisonTimer -= dt;
-      this.hit(this.poisonDps * dt, true);
+      this.hit(this.poisonDps * dt, true, this.poisonSrc);
       if (this.poisonTimer <= 0) this.poisonDps = 0;
     }
     if (this.def.heal) {
@@ -125,18 +126,27 @@ class Enemy {
     if (this.wp >= PATH_PX.length) this.escaped = true;
   }
 
-  // pierce — урон крізь броню (отрута)
-  hit(damage, pierce = false) {
+  // pierce — урон крізь броню (отрута); src — тип монстра, якому зарахувати урон і вбивство
+  hit(damage, pierce = false, src = null) {
     if (this.dead) return;
     this.sinceHit = 0;
     if (!pierce && this.armor) damage = Math.max(damage * 0.2, damage - this.armor);
+    let dealt = 0;
     if (this.shield > 0) {
       const absorbed = Math.min(this.shield, damage);
       this.shield -= absorbed;
       damage -= absorbed;
+      dealt += absorbed;
     }
+    dealt += Math.min(damage, this.hp);
     this.hp -= damage;
     if (this.hp <= 0) this.dead = true;
+    const st = src && game.stats[src];
+    if (st) {
+      st.round += dealt;
+      st.total += dealt;
+      if (this.dead) st.kills++;
+    }
   }
 
   slow(factor, time) {
@@ -150,7 +160,8 @@ class Enemy {
     this.stunTimer = Math.max(this.stunTimer, this.def.boss ? time / 2 : time);
   }
 
-  poison(dps, time) {
+  poison(dps, time, src = null) {
+    if (dps >= this.poisonDps) this.poisonSrc = src;
     this.poisonDps = Math.max(this.poisonDps, dps);
     this.poisonTimer = Math.max(this.poisonTimer, time);
   }
@@ -294,6 +305,7 @@ class Tower {
     const attack = this.def.attack || 'projectile';
     if (attack === 'aura') this.stomp(game, s);
     else if (attack === 'beam') this.beam(game, s);
+    else if (attack === 'web') this.web(game, s);
     else game.projectiles.push(new Projectile(this, target));
     this.cooldown = s.rate;
   }
@@ -303,10 +315,22 @@ class Tower {
     const rad = s.range * CELL;
     for (const e of game.enemies) {
       if (!alive(e) || Math.hypot(e.x - this.x, e.y - this.y) > rad + e.radius) continue;
-      e.hit(s.damage);
+      e.hit(s.damage, false, this.type);
       if (Math.random() < s.stunChance) e.stun(this.def.stun);
     }
     game.effects.push({ kind: 'quake', x: this.x, y: this.y, r: rad, t: 0.35, max: 0.35, color: this.def.color });
+  }
+
+  // павук: павутина на всіх видимих поруч — урон, сповільнення, отрута
+  web(game, s) {
+    const rad = s.range * CELL;
+    for (const e of game.enemies) {
+      if (!alive(e) || e.hidden || Math.hypot(e.x - this.x, e.y - this.y) > rad + e.radius) continue;
+      e.hit(s.damage, false, this.type);
+      e.slow(this.def.slow, this.def.slowTime);
+      e.poison(s.poison, this.def.poisonTime, this.type);
+    }
+    game.effects.push({ kind: 'web', x: this.x, y: this.y, r: rad, t: 0.5, max: 0.5, rot: Math.random() * Math.PI });
   }
 
   // біхолдер: промінь на всю дальність у напрямку angle (для fixedDir — обраний бік світу)
@@ -314,7 +338,7 @@ class Tower {
     const len = s.range * CELL;
     const x2 = this.x + Math.cos(this.angle) * len, y2 = this.y + Math.sin(this.angle) * len;
     for (const e of game.enemies) {
-      if (alive(e) && this.inBeam(e, x2, y2)) e.hit(s.damage);
+      if (alive(e) && this.inBeam(e, x2, y2)) e.hit(s.damage, false, this.type);
     }
     game.effects.push({ kind: 'beam', x: this.x, y: this.y, x2, y2, w: (this.def.beamWidth || 0) * CELL,
       t: 0.3, max: 0.3, color: this.def.color });
@@ -891,6 +915,7 @@ class Projectile {
     this.detect = !!def.detect;
     this.color = tower.def.color;
     this.kind = tower.type;
+    this.src = tower.type;
     this.angle = tower.angle;
     this.done = false;
   }
@@ -942,7 +967,7 @@ class Projectile {
       }
       if (!next) break;
       dmg *= 0.75;
-      next.hit(dmg);
+      next.hit(dmg, false, this.src);
       hit.add(next);
       points.push({ x: next.x, y: next.y });
       from = next;
@@ -951,9 +976,9 @@ class Projectile {
   }
 
   applyTo(e) {
-    e.hit(this.damage);
+    e.hit(this.damage, false, this.src);
     if (this.slow) e.slow(this.slow, this.slowTime);
-    if (this.poison) e.poison(this.poison, this.poisonTime);
+    if (this.poison) e.poison(this.poison, this.poisonTime, this.src);
   }
 
   draw(ctx) {
@@ -973,25 +998,6 @@ class Projectile {
       ctx.fill();
       ctx.fillStyle = '#8b1e3f';
       ctx.fillRect(-10, -2, 3, 4);
-    } else if (this.kind === 'spider') {
-      // грудка павутини з отрутою, що крутиться в польоті
-      ctx.rotate(time * 8);
-      ctx.strokeStyle = 'rgba(230, 240, 220, 0.85)';
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      for (let i = 0; i < 4; i++) {
-        const a = i * Math.PI / 4;
-        ctx.moveTo(Math.cos(a) * 6, Math.sin(a) * 6);
-        ctx.lineTo(-Math.cos(a) * 6, -Math.sin(a) * 6);
-      }
-      ctx.stroke();
-      ctx.beginPath();
-      ctx.arc(0, 0, 3.5, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.fillStyle = this.color;
-      ctx.beginPath();
-      ctx.arc(0, 0, 2, 0, Math.PI * 2);
-      ctx.fill();
     } else {
       // фаєрбол імпа або крижана куля привида — з сяйвом
       const fire = this.kind === 'cannon';

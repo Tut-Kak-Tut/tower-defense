@@ -23,15 +23,18 @@ HTML5 Canvas + чистий JavaScript, без збірки і залежнос�
   Група набігу — `[тип, кількість, інтервал, пауза?]`: група з паузою починає новий загін; у загоні ніхто не обганяє
   попереднього (`Enemy.leader`, `FORMATION_GAP`), тож стрій «авангард → основа → тил» тримається.
 - `js/entities.js` — `towerStats(def, level)` (усі характеристики на рівні — і для гри, і для UI), `Enemy`
-  (броня/щит/отрута/лікування/оглушення/невидимість через `hidden`/`revealed`), `Tower` (атаки `projectile`/`aura`/`beam`,
+  (броня/щит/отрута/лікування/оглушення/невидимість через `hidden`/`revealed`), `Tower` (атаки `projectile`/`aura`/`beam`/`web` — павук кидає павутину навколо себе,
   детектори підсвічують невидимих; біхолдер `fixedDir` б'є смугою `beamWidth` у бік `dir` з `DIRS`, зона дії — `reaches(e)`),
   `Projectile` (сплеш, сповільнення, отрута, ланцюг `jump`),
   малювання: `drawAdventurer` (switch за типом), монстри через мапу `TOWER_DRAW`.
-- `js/game.js` — стан `game` (`mode`, `over`: 'menu'|'win'|'lose', `auto`), `startWave`, `update(dt)`, рекорд, `newTower` (біхолдер одразу дивиться за `bestDir`);
+- `js/game.js` — стан `game` (`mode`, `over`: 'menu'|'win'|'lose', `auto`, `stats` — урон/вбивства за типом монстра), `startWave`, `update(dt)`, рекорд, `newTower` (біхолдер одразу дивиться за `bestDir`);
   малювання: `buildMapLayer()` (кеш), факели, Серце, віньєтка, `drawEffect` (ефекти за `kind`: beam/bolt/quake/кола); цикл `frame`.
 - `js/ui.js` — об'єкт `ui` (placing/selected/hover/tab), події миші й клавіатури, `refreshUI()` кожен кадр, `refreshOverlay()` (меню/кінець), старт гри.
   Розкладка: зліва панель набігу (`refreshRaid`) і бестіарій (`refreshBestiary`, за `game.seen` — хто вже з'являвся за цю гру);
   центр — canvas; справа вкладки «Монстри» / «Посилення» (`refreshUpgrade`, «зараз → після» через `towerStats()`).
+  Праворуч від вкладок — окрема колонка статистики (`refreshStats`): урон за набіг / за гру / вбивства; урон зараховується через `Enemy.hit(dmg, pierce, src)`
+  (`src` = тип монстра, отрута пам'ятає `poisonSrc`) — нова атака має передавати `src`.
+  Музика — `MUSIC` у `ui.js`, файли в `music/` (CC0, автори в `music/CREDITS.txt`), кнопка 🔊 / `M`.
   Іконки в панелях — маленькі canvas, що малюються тими ж функціями (`towerIcon`, `enemyIcon`).
 - `style.css` — темний «кам'яний» інтерфейс, кольори в CSS-змінних `:root`.
 

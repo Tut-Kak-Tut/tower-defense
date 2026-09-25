@@ -27,7 +27,8 @@ const UPGRADE_COST_MUL = 0.8; // ціна апгрейду = cost * 0.8 * пот
 const SELL_REFUND = 0.6;      // при продажу повертається 60% витраченого
 
 // range і splash — у клітинках, rate — секунд між атаками.
-// attack: 'projectile' (за замовчуванням) | 'aura' (б'є всіх у радіусі) | 'beam' (промінь крізь усіх на лінії).
+// attack: 'projectile' (за замовчуванням) | 'aura' (б'є всіх у радіусі) | 'beam' (промінь крізь усіх на лінії)
+//         | 'web' (павутина навколо себе: урон, сповільнення й отрута всім видимим у радіусі).
 // Необов'язкові механіки: splash, slow/slowTime, poison (урон/с крізь броню)/poisonTime,
 // chain (скільки разів перестрибує)/chainRange, stun (с)/stunChance, detect (бачить невидимих),
 // fixedDir (промінь б'є лише в обраний гравцем бік світу, а не в ціль), beamWidth (півширина променя, кл.).
@@ -49,8 +50,8 @@ const TOWERS = {
   },
   spider: {
     name: 'Печерний павук', color: '#8fd14f', cost: 80,
-    damage: 3, range: 2.5, rate: 1.0, projSpeed: 350, poison: 9, poisonTime: 3, slow: 0.8, slowTime: 1,
-    desc: 'Отрутна павутина: шкода з часом крізь броню, трохи сповільнює',
+    attack: 'web', damage: 2, range: 1.6, rate: 1.2, poison: 3, poisonTime: 3, slow: 0.6, slowTime: 1.5,
+    desc: 'Кидає павутину навколо себе: сповільнює на 40% і труїть усіх поруч (отрута б’є крізь броню)',
   },
   golem: {
     name: 'Кам’яний голем', color: '#a89a86', cost: 120, attack: 'aura',
@@ -64,7 +65,7 @@ const TOWERS = {
   },
   eye: {
     name: 'Біхолдер', color: '#ff4d6d', cost: 175, attack: 'beam', fixedDir: true, beamWidth: 1,
-    damage: 30, range: 5, rate: 1.5, detect: true,
+    damage: 30, range: 5, rate: 2.2, detect: true,
     desc: 'Промінь у вибраний бік (↑↓←→) пробиває всіх на лінії, підсвічує невидимих',
   },
 };

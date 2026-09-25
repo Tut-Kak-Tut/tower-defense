@@ -18,6 +18,7 @@
       <button id="speedBtn" class="hud-btn" title="Швидкість гри"></button>
       <button id="autoBtn" class="hud-btn" title="Авто-набіг: наступний почнеться сам (A)"></button>
       <button id="pauseBtn" class="hud-btn" title="Пауза (Пробіл)"></button>
+      <button id="musicBtn" class="hud-btn" title="Музика (M)"></button>
     </header>
 
     <main>
@@ -65,7 +66,7 @@
               Клік по монстру на полі — посилити або вигнати.<br>
               <kbd>1</kbd>–<kbd>7</kbd> монстр · <kbd>Esc</kbd>/ПКМ скасувати ·
               <kbd>Enter</kbd> набіг · <kbd>A</kbd> авто · <kbd>Пробіл</kbd> пауза ·
-              <kbd>R</kbd> повернути промінь біхолдера
+              <kbd>R</kbd> повернути промінь біхолдера · <kbd>M</kbd> музика
             </p>
           </div>
 
@@ -93,6 +94,15 @@
             </div>
           </div>
         </div>
+      </aside>
+
+      <aside id="statsPanel">
+        <h3>Статистика</h3>
+        <div class="st-row st-head">
+          <span></span><span title="Урон за поточний набіг">Набіг</span><span title="Урон за всю гру">Усього</span><span title="Скільки авантюристів добито">Вбито</span>
+        </div>
+        <div id="statsList"></div>
+        <p id="statsEmpty" class="help">Посели монстрів — тут з'явиться, хто скільки нашкодив.</p>
       </aside>
     </main>
   </div>

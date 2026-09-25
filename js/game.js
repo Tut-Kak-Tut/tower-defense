@@ -45,6 +45,7 @@ function newGame(mode = null) {
     heartFlash: 0,      // секунди червоного спалаху Серця після удару
     over: mode ? null : 'menu', // 'menu' | 'win' | 'lose'
     seen: new Set(),    // типи авантюристів, що вже з'являлись — для бестіарію
+    stats: {},          // тип монстра → {round, total, kills}; запис з'являється, щойно такого поселили
   };
 }
 
@@ -84,6 +85,7 @@ function placeTower(type, col, row) {
   if (!canPlace(col, row) || game.money < cost) return false;
   game.money -= cost;
   game.towers.push(newTower(type, col, row));
+  if (!game.stats[type]) game.stats[type] = { round: 0, total: 0, kills: 0 };
   return true;
 }
 
@@ -133,6 +135,7 @@ function sellTower(tower) {
 function startWave() {
   if (game.waveActive || game.over || game.wave >= maxWaves()) return;
   game.wave++;
+  for (const st of Object.values(game.stats)) st.round = 0;
   const groups = waveGroups(game.wave);
   game.spawnQueue = [];
   let squad = 0;
@@ -464,6 +467,35 @@ function drawEffect(fx) {
       ctx.lineTo(b.x, b.y);
     }
     ctx.stroke();
+  } else if (fx.kind === 'web') {
+    // павутина павука: радіальні нитки й кільця розкриваються і тануть
+    const r = fx.r * (1 - k * k * 0.6);
+    ctx.translate(fx.x, fx.y);
+    ctx.rotate(fx.rot);
+    ctx.strokeStyle = '#e6f2d8';
+    ctx.globalAlpha = Math.min(1, k * 1.5) * 0.7;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    const N = 8;
+    for (let i = 0; i < N; i++) {
+      const a = i * Math.PI * 2 / N;
+      ctx.moveTo(0, 0);
+      ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r);
+    }
+    // кільця — ламаними між нитками, як справжня павутина
+    for (const f of [0.35, 0.65, 0.95]) {
+      for (let i = 0; i <= N; i++) {
+        const a = i * Math.PI * 2 / N;
+        const px = Math.cos(a) * r * f, py = Math.sin(a) * r * f;
+        if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+      }
+    }
+    ctx.stroke();
+    ctx.globalAlpha = k * 0.12;
+    ctx.fillStyle = '#8fd14f';
+    ctx.beginPath();
+    ctx.arc(0, 0, r, 0, Math.PI * 2);
+    ctx.fill();
   } else if (fx.kind === 'quake') {
     // удар голема: кільце, що розходиться по землі
     ctx.strokeStyle = fx.color;

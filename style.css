@@ -24,7 +24,9 @@ body {
   font-family: Georgia, "Times New Roman", serif;
 }
 
-#app { max-width: 1400px; margin: 0 auto; padding: 16px; }
+/* праворуч без відступу — колонка статистики може доходити до краю екрана */
+#app { margin: 0 auto; padding: 16px 0 16px 16px; }
+#hud { padding-right: 16px; }
 
 #hud {
   display: flex;
@@ -56,16 +58,21 @@ body {
 
 main {
   display: grid;
-  grid-template-columns: 240px minmax(0, 800px) 270px;
+  grid-template-columns: 240px minmax(0, 800px) 270px 220px;
   gap: 16px;
   align-items: start;
   justify-content: center;
 }
 @media (max-width: 1400px) {
+  #app { padding-right: 16px; }
+  #hud { padding-right: 0; }
   /* поле зверху на всю ширину, бічні колонки — під ним */
-  main { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  main { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   #board { grid-column: 1 / -1; justify-self: center; }
   #left { grid-row: 2; }
+}
+@media (max-width: 1000px) {
+  main { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
 }
 @media (max-width: 640px) {
   main { grid-template-columns: minmax(0, 1fr); }
@@ -212,6 +219,34 @@ button.tab.active {
   box-shadow: inset 0 1px 0 rgba(255,255,255,0.05), inset 0 0 20px rgba(0,0,0,0.35), 0 4px 12px rgba(0,0,0,0.5);
 }
 .window .help { margin: 10px 0 0; }
+
+/* ---------- статистика урону ---------- */
+#statsPanel {
+  min-width: 0;
+  background: linear-gradient(var(--stone-hi), var(--stone));
+  border: 1px solid var(--stone-edge);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.05), 0 4px 12px rgba(0,0,0,0.5);
+  border-radius: 8px;
+  padding: 12px;
+}
+.st-row {
+  display: grid;
+  grid-template-columns: 28px 1fr 1fr 0.8fr;
+  column-gap: 6px;
+  align-items: center;
+  padding: 2px 6px;
+  margin-bottom: 3px;
+  border-radius: 5px;
+  background: rgba(0,0,0,0.22);
+  font-variant-numeric: tabular-nums;
+  font-size: 13px;
+}
+.st-row span { text-align: right; }
+.st-row span:last-child { color: var(--soul); font-weight: 700; }
+.st-row canvas { display: block; }
+.st-head { background: none; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
+.st-head span:last-child { color: var(--muted); font-weight: normal; }
+#statsPanel .help { margin: 4px 0 0; }
 
 /* ---------- посилення ---------- */
 .up-head { display: flex; align-items: center; gap: 10px; }
