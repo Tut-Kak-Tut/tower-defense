@@ -20,7 +20,7 @@ const WAVE_BONUS = 20;        // бонус за пройдену хвилю (+5
 // ріст HP і нагороди за набігами — hpMul() / rewardMul() унизу, біля генератора набігів
 
 const MAX_LEVEL = 10;
-const LVL_DMG = 1.3;          // урон ×1.3 за кожен рівень
+const LVL_DMG = 1.25;         // урон ×1.25 за кожен рівень
 const LVL_RANGE = 0.15;       // +0.15 клітинки дальності за рівень
 const LVL_RATE = 0.96;        // пауза між атаками ×0.96 за рівень (на 4% частіше)
 const UPGRADE_COST_MUL = 0.8; // ціна апгрейду = cost * 0.8 * поточний рівень
@@ -99,9 +99,9 @@ const ENEMIES = {
             desc: 'Магічний щит поглинає урон і відновлюється, якщо мага 2 с не били; холод на нього не діє' },
   scout:  { name: 'Ельф-розвідник', color: '#3f6f5a', hp: 35, speed: 120, reward: 8, radius: 8, stealth: true,
             desc: 'Невидимий: його видно лише поруч із привидом чи оком' },
-  knight: { name: 'Вершник', color: '#9aa4b0', hp: 180, speed: 85,  reward: 18, radius: 14, armor: 2, lifeDmg: 2,
+  knight: { name: 'Вершник', color: '#9aa4b0', hp: 180, speed: 75,  reward: 18, radius: 14, armor: 2, lifeDmg: 2,
             desc: 'Швидкий і міцний, прорвавшись, б’є Серце вдвічі сильніше' },
-  hero:   { name: 'Герой',   color: '#d4a82a', hp: 1000, speed: 30, reward: 100, radius: 17,
+  hero:   { name: 'Герой',   color: '#d4a82a', hp: 500, speed: 30, reward: 100, radius: 17,
             armor: 4, shield: 0.25, lifeDmg: 5, boss: true,
             desc: 'Легендарний бос: броня, щит, величезне здоров’я' },
 };
@@ -147,7 +147,7 @@ const SQUADS = [
   { name: 'Бойова партія',     units: [['gnome', 1], ['normal', 2], ['mage', 1]] },
   { name: 'Класична партія',   units: [['tank', 1], ['fast', 1], ['mage', 1], ['priest', 1]] },
   { name: 'Тіньова група',     units: [['scout', 2], ['fast', 2]] },
-  { name: 'Кавалерійський наскок', units: [['knight', 2], ['scout', 1]] },
+  { name: 'Кавалерійський наскок', units: [['knight', 1], ['scout', 1]] },
   { name: 'Велика експедиція', units: [['knight', 1], ['gnome', 1], ['normal', 2], ['mage', 1], ['priest', 1]] },
 ];
 
@@ -161,7 +161,9 @@ function hash(a, b, seed = 0) {
 
 // «Розмір набігу»: швидко росте до 38-го, далі повільніше, але без стелі — інакше пізні набіги стають легкими.
 const waveSize = n => n <= 38 ? 1 + n * 0.08 : 4.04 + (n - 38) * 0.03;
-const squadMass = s => s.units.reduce((m, [t, c]) => m + ENEMIES[t].hp * c, 0);
+// «Загроза» загону: HP × швидкість (відносно воїна) × удар по Серцю — швидких і вершників у набігу менше.
+const threat = t => ENEMIES[t].hp * ENEMIES[t].speed / 60 * (ENEMIES[t].lifeDmg || 1);
+const squadMass = s => s.units.reduce((m, [t, c]) => m + threat(t) * c, 0);
 
 // Склад набігу n (з 1).
 function waveGroups(n) {
@@ -188,15 +190,15 @@ function waveGroups(n) {
     add(pick(2).units);
     const guard = open('knight') ? 'knight' : open('gnome') ? 'gnome' : 'tank';
     const rear = ['priest', 'mage'].filter(open);
-    add([[guard, 1], ['hero', 1 + Math.floor(n / 40)], ...rear.map(t => [t, 1])]);
+    add([[guard, 1], ['hero', 1 + Math.floor((n - 1) / 50)], ...rear.map(t => [t, 1])]);
     return groups;
   }
-  const budget = 600 * size;                              // сумарне базове HP набігу
+  const budget = 1100 * size;                             // сумарна базова загроза набігу
   let mass = 0;
   if (n % 5 === 0) {
     // тематичний набіг — той самий загін раз за разом
     const s = pick(1);
-    for (let i = 0; mass < budget && i < 10; i++) { add(s.units, 0.8); mass += squadMass(s) * sq * 0.8; }
+    for (let i = 0; mass < budget && i < 8; i++) { add(s.units, 0.8); mass += squadMass(s) * sq * 0.8; }
     return groups;
   }
   // щойно відкритий тип приходить першим — у невеликому загоні, де він на своєму місці в строю
@@ -215,6 +217,7 @@ function waveGroups(n) {
 }
 
 // Множники сили й нагороди авантюристів на набігу n.
-const hpMul = n => 1 + 0.12 * (n - 1) + 0.0022 * (n - 1) ** 2;
-const rewardMul = n => 1 + 0.02 * (n - 1);
-const speedMul = n => 1;
+// Після кампанії HP росте ще й експоненційно — безкінечний режим рано чи пізно ламає будь-яку оборону.
+const hpMul = n => (1 + 0.12 * (n - 1) + 0.003 * (n - 1) ** 2) * 1.02 ** Math.max(0, n - CAMPAIGN_WAVES);
+const rewardMul = n => 1 + 0.008 * (n - 1);
+const speedMul = n => 1 + Math.min(0.3, 0.003 * (n - 1));   // авантюристи досвідченішають: до +30% швидкості
