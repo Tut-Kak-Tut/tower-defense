@@ -382,11 +382,14 @@ function refreshUI() {
   const max = maxWaves();
   $('money').textContent = game.money;
   $('lives').textContent = game.lives;
+  const full = game.towers.length >= MAX_TOWERS;
+  $('towerCount').textContent = `${game.towers.length} / ${MAX_TOWERS}`;
+  $('towersStat').classList.toggle('full', full);
   $('wave').textContent = `${game.wave} / ${max === Infinity ? '∞' : max}`;
 
   for (const [type, btn] of Object.entries(towerButtons)) {
     btn.classList.toggle('active', ui.placing === type);
-    btn.classList.toggle('poor', game.money < TOWERS[type].cost);
+    btn.classList.toggle('poor', full || game.money < TOWERS[type].cost);
   }
 
   refreshRaid();

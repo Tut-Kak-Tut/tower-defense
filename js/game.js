@@ -82,7 +82,7 @@ function canPlace(col, row) {
 
 function placeTower(type, col, row) {
   const cost = TOWERS[type].cost;
-  if (!canPlace(col, row) || game.money < cost) return false;
+  if (!canPlace(col, row) || game.money < cost || game.towers.length >= MAX_TOWERS) return false;
   game.money -= cost;
   game.towers.push(newTower(type, col, row));
   if (!game.stats[type]) game.stats[type] = { round: 0, total: 0, kills: 0 };
@@ -522,7 +522,7 @@ function draw() {
   // привид вежі під курсором
   if (ui.placing && ui.hover && inBounds(ui.hover.col, ui.hover.row)) {
     const { col, row } = ui.hover;
-    const ok = canPlace(col, row) && game.money >= TOWERS[ui.placing].cost;
+    const ok = canPlace(col, row) && game.money >= TOWERS[ui.placing].cost && game.towers.length < MAX_TOWERS;
     ctx.fillStyle = ok ? 'rgba(150,95,220,0.35)' : 'rgba(239,71,111,0.4)';
     ctx.fillRect(col * CELL, row * CELL, CELL, CELL);
     const ghost = newTower(ui.placing, col, row);
