@@ -143,6 +143,19 @@ $('upgradeBtn').addEventListener('click', () => { if (ui.selected) upgradeTower(
 document.querySelectorAll('#dirPad button').forEach(b => b.addEventListener('click', () => {
   if (ui.selected && ui.selected.def.fixedDir) ui.selected.setDir(+b.dataset.dir);
 }));
+// фільтр цілі: кнопки з TARGET_MODES, T — наступний режим
+for (const [mode, m] of Object.entries(TARGET_MODES)) {
+  const b = document.createElement('button');
+  b.dataset.aim = mode;
+  b.textContent = m.label;
+  b.title = m.title;
+  b.addEventListener('click', () => { if (ui.selected && ui.selected.aims) ui.selected.aim = mode; });
+  $('aimBtns').appendChild(b);
+}
+function nextAim(t) {
+  const modes = Object.keys(TARGET_MODES);
+  t.aim = modes[(modes.indexOf(t.aim) + 1) % modes.length];
+}
 $('sellBtn').addEventListener('click', () => { if (ui.selected) askSell(ui.selected); });
 
 // Питання перед вигнанням: гра на паузі, поки гравець не відповість (Enter — так, Esc — ні).
@@ -229,6 +242,7 @@ document.addEventListener('keydown', e => {
   else if (e.code === 'KeyA') toggleAuto(); // за кодом клавіші — працює і в українській розкладці
   else if (e.code === 'KeyM') toggleMusic();
   else if (e.code === 'KeyR' && ui.selected && ui.selected.def.fixedDir) ui.selected.setDir(ui.selected.dir + 1);
+  else if (e.code === 'KeyT' && ui.selected && ui.selected.aims) nextAim(ui.selected);
 });
 
 // ---------- панель набігу ----------
@@ -434,6 +448,11 @@ function refreshUpgrade() {
   $('dirPad').classList.toggle('hidden', !t.def.fixedDir);
   if (t.def.fixedDir) {
     document.querySelectorAll('#dirPad button').forEach(b => b.classList.toggle('on', +b.dataset.dir === t.dir));
+  }
+
+  $('aimPad').classList.toggle('hidden', !t.aims);
+  if (t.aims) {
+    document.querySelectorAll('#aimBtns button').forEach(b => b.classList.toggle('on', b.dataset.aim === t.aim));
   }
 
   const up = $('upgradeBtn');

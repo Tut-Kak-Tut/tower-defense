@@ -273,6 +273,11 @@ button.tab.active {
 #dirPad { display: flex; align-items: center; gap: 4px; margin-top: 6px; }
 #dirPad .dir-label { flex: 1; font-size: 13px; color: var(--muted); }
 #dirPad button { width: 34px; margin: 0; padding: 4px 0; font-size: 15px; }
+#aimPad { margin-top: 6px; }
+#aimPad .dir-label { font-size: 13px; color: var(--muted); }
+#aimBtns { display: flex; gap: 3px; margin-top: 3px; }
+#aimBtns button { flex: 1; margin: 0; padding: 4px 0; font-size: 12px; }
+#aimBtns button.on,
 #dirPad button.on { border-color: #ff4d6d; color: #ffd0d8; box-shadow: 0 0 8px rgba(255, 77, 109, 0.45); }
 
 button {

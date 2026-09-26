@@ -426,10 +426,20 @@ class Enemy {
   }
 }
 
+// Фільтри цілі: з доступних монстр бере того, в кого score найбільший.
+const TARGET_MODES = {
+  first:  { label: 'Перший',  title: 'Найдальший по коридору',          score: e => e.progress },
+  last:   { label: 'Останній', title: 'Найближчий до входу',             score: e => -e.progress },
+  strong: { label: 'Сильний', title: 'Найбільше HP (зі щитом)',          score: e => e.hp + e.shield },
+  weak:   { label: 'Слабкий', title: 'Найменше HP (зі щитом)',           score: e => -(e.hp + e.shield) },
+  close:  { label: 'Ближній', title: 'Найближчий до монстра',            score: (e, t) => -Math.hypot(e.x - t.x, e.y - t.y) },
+};
+
 class Tower {
   constructor(type, col, row) {
     this.type = type;
     this.def = TOWERS[type];
+    this.aim = 'first';   // кого цілити — ключ TARGET_MODES
     this.col = col;
     this.row = row;
     const c = cellCenter(col, row);
@@ -482,6 +492,11 @@ class Tower {
     return s;
   }
 
+  // Чи обирає монстр ціль сам (тоді гравець може задати фільтр цілі)
+  get aims() {
+    return !this.def.fixedDir && !['aura', 'haunt', 'buff', 'manual', 'grave'].includes(this.def.attack);
+  }
+
   // Чи може цей монстр атакувати авантюриста: невидимих — лише з detect.
   canHit(e) {
     return alive(e) && (!e.hidden || this.def.detect);
@@ -508,11 +523,13 @@ class Tower {
     if (attack === 'drain') { this.drain(game, dt, this.stats()); return; }
     this.cooldown -= dt;
     if (this.cooldown > 0) return;
-    let target = null;
+    let target = null, best = -Infinity;
+    const score = TARGET_MODES[this.aim].score;
     for (const e of game.enemies) {
       // біхолдер не повертається — стріляє, лише коли хтось на лінії його променя
       if (!this.canHit(e) || !this.reaches(e)) continue;
-      if (!target || e.progress > target.progress) target = e;
+      const v = score(e, this);
+      if (v > best) { best = v; target = e; }
     }
     if (!target) return;
     if (!this.def.fixedDir) this.angle = Math.atan2(target.y - this.y, target.x - this.x);
@@ -542,7 +559,7 @@ class Tower {
     }
     if (this.links.size < s.targets) {
       const free = game.enemies.filter(e => !this.links.has(e) && this.canHit(e) && this.reaches(e))
-        .sort((a, b) => b.progress - a.progress);
+        .sort((a, b) => TARGET_MODES[this.aim].score(b, this) - TARGET_MODES[this.aim].score(a, this));
       for (const e of free.slice(0, s.targets - this.links.size)) this.links.set(e, 0);
     }
     this.rampTime = this.def.ramp * s.rate;
