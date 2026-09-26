@@ -7,7 +7,7 @@ Tower defense у браузері в темі підземелля: гравец
 ## Стек
 HTML5 Canvas + чистий JavaScript, без збірки і залежностей (шрифт Cinzel з Google Fonts, фолбек Georgia).
 Скрипти — звичайні `<script>` (не ES-модулі), щоб працювало з `file://`. Порядок підключення важливий:
-`config.js` → `monsters/monster.js` → `monsters/monsters.js` → `adventurers/adventurer.js` → `adventurers/adventurers.js` → `entities.js` → `game.js` → `ui.js`. Усі мають спільну глобальну область видимості.
+`config.js` → `monsters/monster.js` → `monsters/monsters.js` → `adventurers/adventurer.js` → `adventurers/adventurers.js` → `waves/wave.js` → `waves/campaign.js` → `waves/endless.js` → `entities.js` → `game.js` → `ui.js`. Усі мають спільну глобальну область видимості.
 
 ## Тема ↔ код
 Код лишився з TD-назвами: `Tower` = монстр, `Enemy` = авантюрист, `money` = душі, `lives` = міцність Серця,
@@ -17,12 +17,8 @@ HTML5 Canvas + чистий JavaScript, без збірки і залежнос�
 `priest` жрець, `mage` маг, `scout` розвідник, `knight` вершник, `jester` шут, `blade` майстер меча, `hero` герой-бос.
 
 ## Структура
-- `js/config.js` — баланс (крім монстрів і авантюристів — вони в `js/monsters/` і `js/adventurers/`): мапа/шлях, факели, ліміт монстрів `MAX_TOWERS`,
-  `MAX_LEVEL`, набіги: `FIRST_WAVES` (1–10 вручну) + генератор `waveGroups(n)`
-  із загонів `SQUADS` (розклад появи `ENEMY_UNLOCK` — заповнюється з `setUnlockWave`, бюджет набігу за «загрозою» `threat`, бос кожні 10, тематичний кожні 5),
-  криві `waveSize(n)` / `hpMul(n)` / `rewardMul(n)` / `speedMul(n)`, `hash()`.
-  Група набігу — `[тип, кількість, інтервал, пауза?]`: група з паузою починає новий загін; у загоні ніхто не обганяє
-  попереднього (`Enemy.leader`, `FORMATION_GAP`), тож стрій «авангард → основа → тил» тримається.
+- `js/config.js` — загальне: мапа/шлях, факели, `MAX_TOWERS`, `MAX_LEVEL`, `CAMPAIGN_WAVES`, `hash()`.
+  Монстри, авантюристи й набіги — у своїх папках (`js/monsters/`, `js/adventurers/`, `js/waves/`).
 - `js/monsters/monster.js` — `Monster` (вид монстра) і `MonsterBuilder`: `set…` задають 1-й рівень, `setLevel(N, {upgradeCost, стат…})` —
   що змінюється на рівні N (решта переходить з попереднього). `build()` перевіряє поля/рівні й кладе монстра в реєстр `TOWERS` (оголошений тут же); види атаки описані над `ATTACKS`,
   рівні зберігаються як `def.levels` (масиви на 10 рівнів + `upgrade`), `towerStats()` читає їх за `LEVEL_STATS`.
@@ -30,6 +26,15 @@ HTML5 Canvas + чистий JavaScript, без збірки і залежнос�
 - `js/adventurers/adventurer.js` — `Adventurer` (вид авантюриста) і `AdventurerBuilder`; реєстри `ENEMIES`, `ENEMY_UNLOCK`, `SPAWN_GAP` заповнює `build()`
   (перевіряє обов'язкові поля, набіг появи після 10-го не кратний 5, `setSpawnOnDeath` — лише на вже оголошеного).
 - `js/adventurers/adventurers.js` — самі авантюристи ланцюжками `new AdventurerBuilder(id)…build()`; порядок = порядок у бестіарії.
+  Сила з набігами — опорні точки `setWave(n, {hp, speed, reward, armor, splitReward})`: між ними лінійно, після останньої —
+  тим самим темпом (`Adventurer.statsAt(n)`); точки згенеровані зі старої кривої HP `1 + 0.12(n−1) + 0.0019(n−1)²`.
+- `js/waves/wave.js` — `WaveBuilder` (`.squad(пауза).add(тип, к-сть, інтервал, баф?)`, `.buff({hp, speed, reward, armor})`) → реєстр `WAVES`;
+  `waveGroups(n)` (з `WAVES`, інакше генератор безкінечного), `waveBuff(n)`, `mergeBuff`, `adventurerStats(type, n, buff)` — сила для `Enemy`.
+  Група набігу — `[тип, кількість, інтервал, пауза?, баф?]`: група з паузою починає новий загін; у загоні ніхто не обганяє
+  попереднього (`Enemy.leader`, `FORMATION_GAP`), тож стрій «авангард → основа → тил» тримається.
+- `js/waves/campaign.js` — усі 100 набігів кампанії ланцюжками `WaveBuilder` (згенеровані зі старого генератора, далі — вручну).
+- `js/waves/endless.js` — безкінечний: `EndlessBuilder` (ріст HP і броні після кампанії `setHpGrowth`, бос/тематичний кожні N, бюджет
+  «загрози» `threat`, розмір набігу, загони `addSquad` — доступні, коли всі типи відкриті `setUnlockWave`) → `ENDLESS.generate(n)`.
 - `js/entities.js` — `towerStats(def, level)` (усі характеристики на рівні — і для гри, і для UI; `Tower.stats()` — те саме
   з бафами відьми `tower.buffs`, у грі брати його), `targetsAt()` (цілі/валуни на рівні), `Enemy`
   (`setProgress(p)` ставить на будь-яке місце шляху за `PATH_LEN`; `spawnOnDeath()` — воїн вершника, половинки шута,
@@ -59,14 +64,14 @@ HTML5 Canvas + чистий JavaScript, без збірки і залежнос�
 ## Правила
 - Графіка — лише примітиви Canvas, без картинок.
 - Відстані в config — у клітинках (`CELL` = 40px), швидкості ворогів — px/с.
-- Новий монстр = ланцюжок `MonsterBuilder` у `monsters.js` (з `setLevel` на 2…10) + функція малювання в `TOWER_DRAW`; новий авантюрист = ланцюжок `AdventurerBuilder` в `adventurers.js` (з `setSpawnGap`, для генератора `setUnlockWave`)
-  + `case` у `drawAdventurer()` + місце хоча б в одному загоні `SQUADS`. Нова характеристика, що росте з рівнем, — ключ у `LEVEL_STATS` (monster.js), рядок у `refreshUpgrade` і `levelGains`.
-- Набіг відкриття нового типу — не кратний 5 (там тематичні/бос-набіги, новачок не потрапить першим).
-- Склад набігів детермінований (`hash`), бо панель показує його наперед — не використовуй там `Math.random`.
+- Новий монстр = ланцюжок `MonsterBuilder` у `monsters.js` (з `setLevel` на 2…10) + функція малювання в `TOWER_DRAW`; новий авантюрист = ланцюжок `AdventurerBuilder` в `adventurers.js` (з `setSpawnGap` і `setWave`)
+  + `case` у `drawAdventurer()` + поява в набігах `campaign.js` + (для безкінечного) `setUnlockWave` і місце в загоні `addSquad`. Нова характеристика, що росте з рівнем, — ключ у `LEVEL_STATS` (monster.js), рядок у `refreshUpgrade` і `levelGains`.
+- Для безкінечного `setUnlockWave` > 100 — не кратний 5 (там тематичні/бос-набіги, новачок не потрапить першим).
+- Склад набігів детермінований (генератор — через `hash`), бо панель показує його наперед — не використовуй там `Math.random`.
 - Статичне малюємо в `buildMapLayer()` (з `hash()`, щоб не мерехтіло); анімації — через глобальний `time`, не через ігровий `dt`.
 - `refreshUI()` не перестворює DOM кожен кадр (лише textContent/класи), інакше ламаються кліки.
 - Баланс перевіряли headless-прогоном у Node (заглушки DOM + бот): бот проходить кампанію з поодинокими проривами;
   метрика — середня частка шляху, яку проходять вороги, по десятках набігів (має рости з ~0.2 до ~0.35–0.4).
-  Край складності — квадратичний коефіцієнт `hpMul` ~0.0022–0.0025 (зараз 0.0019): вище бот уже не проходить 100-й набіг
+  Край складності — квадратичний коефіцієнт кривої HP ~0.0022–0.0025 (зараз 0.0019, тепер закладений у `setWave`): вище бот уже не проходить 100-й набіг
   (знизили з 0.003, коли привид перестав сповільнювати всіх). Бот не кидає валуни й не підлаштовується під магів/невидимих.
-  Безкінечний після 100-го — ще ×1.02 HP за набіг, тож максимально прокачана оборона падає невдовзі після 100-го.
+  Безкінечний після 100-го — ще ×1.02 HP і броні за набіг (`setHpGrowth`), тож максимально прокачана оборона падає невдовзі після 100-го.

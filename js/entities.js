@@ -46,21 +46,24 @@ for (let i = 1; i < PATH_PX.length; i++) {
 }
 
 class Enemy {
-  constructor(type, hpMul, rewardMul = 1, speedMul = 1) {
+  // wave — номер набігу (сила — з setWave авантюриста), buff — множники набігу/групи (WaveBuilder)
+  constructor(type, wave = 1, buff = {}) {
     const def = ENEMIES[type];
+    const s = adventurerStats(type, wave, buff);
     this.type = type;
     this.def = def;
     this.origin = type;   // тип-прабатько: воїн вершника й діти шута рахуються в рядку свого прабатька
-    this.muls = [hpMul, rewardMul, speedMul]; // множники набігу — для тих, хто з'являється з цього авантюриста
+    this.wave = wave;     // набіг і баф — для тих, хто з'являється з цього авантюриста
+    this.buff = buff;
     this.color = def.color;
     this.radius = def.radius;
-    this.baseSpeed = def.speed * speedMul;
+    this.baseSpeed = s.speed;
     this.leader = null;   // хто йде попереду в загоні — його не обганяємо
-    this.reward = Math.round(def.reward * rewardMul);
-    this.maxHp = Math.round(def.hp * hpMul);
+    this.reward = Math.round(s.reward);
+    this.splitReward = Math.round(s.splitReward);   // шут: душі за кожного з найменших
+    this.maxHp = Math.round(s.hp);
     this.hp = this.maxHp;
-    // броня росте повільніше за HP, інакше на пізніх набігах вона обнуляла б слабких монстрів
-    this.armor = (def.armor || 0) * (1 + (hpMul - 1) * 0.25);
+    this.armor = s.armor;
     this.maxShield = Math.round(this.maxHp * (def.shield || 0));
     this.shield = this.maxShield;
     this.sinceHit = 0;    // секунди від останнього удару — для відновлення щита
@@ -182,7 +185,7 @@ class Enemy {
   spawnOnDeath() {
     const out = [];
     const make = (type, progress) => {
-      const e = new Enemy(type, ...this.muls);
+      const e = new Enemy(type, this.wave, this.buff);
       e.origin = this.origin;
       e.summoned = true;
       e.leader = this.leader;
@@ -199,7 +202,7 @@ class Enemy {
         e.maxHp = e.hp = Math.max(1, Math.round(this.maxHp / 2));
         e.radius = this.radius * 0.8;
         e.revealed = this.revealed;
-        e.reward = e.gen === this.def.split ? Math.round(this.def.splitReward * this.muls[1]) : 0;
+        e.reward = e.gen === this.def.split ? this.splitReward : 0;
       }
     }
     return out;

@@ -167,14 +167,16 @@ function startWave() {
   game.wave++;
   for (const st of Object.values(game.stats)) st.round = 0;
   const groups = waveGroups(game.wave);
+  const wb = waveBuff(game.wave);
   game.spawnQueue = [];
   let squad = 0;
-  groups.forEach(([type, count, interval, gap], gi) => {
+  groups.forEach(([type, count, interval, gap, gb], gi) => {
     if (gap !== undefined && gi > 0) squad++;   // група з паузою починає новий загін
+    const buff = gb ? mergeBuff(wb, gb) : wb;
     for (let i = 0; i < count; i++) {
       // delay — пауза перед появою цього ворога; у продовженні загону пауза = звичайний інтервал
       const delay = i === 0 ? (gi === 0 ? 0 : gap ?? interval) : interval;
-      game.spawnQueue.push({ type, delay, squad });
+      game.spawnQueue.push({ type, delay, squad, buff });
     }
   });
   game.lastInSquad = [];
@@ -193,11 +195,10 @@ function update(dt) {
   // поява ворогів
   if (game.spawnQueue.length) {
     game.spawnTimer -= dt;
-    const hp = hpMul(game.wave), reward = rewardMul(game.wave), speed = speedMul(game.wave);
     while (game.spawnQueue.length && game.spawnTimer <= 0) {
       const s = game.spawnQueue.shift();
       game.seen.add(s.type);
-      const e = new Enemy(s.type, hp, reward, speed);
+      const e = new Enemy(s.type, game.wave, s.buff);
       e.leader = game.lastInSquad[s.squad] || null;   // іде за попереднім у своєму загоні
       game.lastInSquad[s.squad] = e;
       game.enemies.push(e);

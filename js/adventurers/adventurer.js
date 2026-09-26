@@ -1,15 +1,33 @@
 // Опис виду авантюриста (Adventurer) і будівельник для нього (AdventurerBuilder). Самі авантюристи — у adventurers.js (ця ж папка).
 // Adventurer — «картка виду». Авантюрист, що йде коридором, — клас Enemy (entities.js).
 
-// Реєстри, які заповнює build(): види за id, набіг першої появи (для генератора) та інтервал появи в загоні.
+// Реєстри, які заповнює build(): види за id, набіг першої появи (для генератора безкінечного) та інтервал появи в загоні.
 const ENEMIES = {};
 const ENEMY_UNLOCK = {};
 const SPAWN_GAP = {};
 
+// Характеристики, що ростуть з набігами (setWave).
+const WAVE_STATS = ['hp', 'speed', 'reward', 'armor', 'splitReward'];
+
 class Adventurer {
-  constructor(id, params) {
+  constructor(id, params, waves) {
     this.id = id;
     Object.assign(this, params);
+    this.waves = waves;   // опорні точки [[набіг, { hp, speed, ... }], ...] за зростанням
+  }
+
+  // Характеристики на набігу n: між опорними точками setWave — плавно (лінійно), після останньої — тим самим темпом.
+  statsAt(n) {
+    const s = {};
+    for (const key of WAVE_STATS) {
+      const pts = [[1, this[key] || 0], ...this.waves.filter(([, v]) => key in v).map(([w, v]) => [w, v[key]])];
+      if (pts.length === 1) { s[key] = pts[0][1]; continue; }
+      let i = 1;
+      while (i < pts.length - 1 && pts[i][0] < n) i++;
+      const [w0, v0] = pts[i - 1], [w1, v1] = pts[i];
+      s[key] = v0 + (v1 - v0) * (n - w0) / (w1 - w0);
+    }
+    return s;
   }
 }
 
@@ -19,6 +37,7 @@ class AdventurerBuilder {
     this.params = {};
     this.unlock = undefined;
     this.spawnGap = undefined;
+    this.waves = {};      // набіг → { hp, speed, reward, armor, splitReward }
   }
 
   set(key, value) { this.params[key] = value; return this; }
@@ -34,10 +53,13 @@ class AdventurerBuilder {
   setLifeDamage(n) { return this.set('lifeDmg', n); }               // скільки міцності Серця знімає при прориві (1)
 
   // --- набіги ---
-  setUnlockWave(n) { this.unlock = n; return this; }                // з якого набігу з'являється в генераторі (після 10-го — не кратний 5)
+  setUnlockWave(n) { this.unlock = n; return this; }                // з якого набігу його ставить генератор безкінечного (кампанія — у waves/campaign.js)
   setSpawnGap(seconds) { this.spawnGap = seconds; return this; }    // інтервал появи в загоні до скорочення з набігами
   setCountMul(mul) { return this.set('countMul', mul); }            // у генерованих набігах таких менше (множник кількості)
   setBoss(on = true) { return this.set('boss', on); }               // велика смужка HP
+  // Сила на набігу n: { hp, speed, reward, armor, splitReward } — будь-які з них. Між точками значення ростуть плавно,
+  // після останньої — тим самим темпом; набіг 1 — це setHp/setSpeed/... Приклад: .setWave(50, { hp: 390, reward: 11 })
+  setWave(n, stats) { this.waves[n] = { ...this.waves[n], ...stats }; return this; }
 
   // --- захист ---
   setArmor(n) { return this.set('armor', n); }                      // віднімається від удару (лишається щонайменше 20%)
@@ -70,13 +92,18 @@ class AdventurerBuilder {
       if (p[key] === undefined) fail(`не задано ${key}`);
     }
     if (this.spawnGap === undefined) fail('не задано setSpawnGap');
-    // набіги до FIRST_WAVES.length задані вручну, правило — лише для генератора
-    if (this.unlock > FIRST_WAVES.length && this.unlock % 5 === 0) {
+    // кампанія задана вручну, правило — лише для генератора безкінечного
+    if (this.unlock > CAMPAIGN_WAVES && this.unlock % 5 === 0) {
       fail(`набіг появи ${this.unlock} кратний 5 — там тематичні й бос-набіги, новачок не потрапить першим`);
     }
     if (p.spawn && !ENEMIES[p.spawn]) fail(`setSpawnOnDeath('${p.spawn}'): такого авантюриста ще не оголошено вище`);
 
-    const adventurer = new Adventurer(id, p);
+    for (const [n, stats] of Object.entries(this.waves)) {
+      if (!(n >= 2)) fail(`setWave(${n}): набіг має бути від 2 (набіг 1 — це setHp/setSpeed/...)`);
+      for (const key in stats) if (!WAVE_STATS.includes(key)) fail(`setWave(${n}): '${key}' не росте з набігами (можна: ${WAVE_STATS.join(', ')})`);
+    }
+    const waves = Object.entries(this.waves).map(([n, v]) => [+n, v]).sort((a, b) => a[0] - b[0]);
+    const adventurer = new Adventurer(id, p, waves);
     ENEMIES[id] = adventurer;
     SPAWN_GAP[id] = this.spawnGap;
     if (this.unlock !== undefined) ENEMY_UNLOCK[id] = this.unlock;
