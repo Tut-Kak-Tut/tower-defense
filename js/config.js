@@ -49,7 +49,7 @@ const MAX_TOWERS = 18;        // скільки монстрів може жит
 const TOWERS = {
   archer: {
     name: 'Скелет-лучник', color: '#e8dcc0', cost: 50,
-    damage: 10, range: 3, rate: 0.9, projSpeed: 550, dmgLvl: 1, rangeLvl: 1.5 / 9, rateLvl: 0.92,
+    damage: 10, range: 3, rate: 0.8, projSpeed: 550, dmgLvl: 1, rangeLvl: 1.5 / 9, rateLvl: 0.92,
     desc: 'Влучає в одного авантюриста; з рівнем стріляє частіше й далі (до 4.5 кл.), урон незмінний',
   },
   cannon: {
@@ -59,7 +59,7 @@ const TOWERS = {
   },
   frost: {
     name: 'Привид', color: '#8fe3ff', cost: 75, attack: 'haunt',
-    damage: 0, range: 2.5, slow: 0.5, slowLvl: 0.015, detect: true, frail: 0.1, frailLvl: 0.1 / 9,
+    damage: 0, range: 2.5, slow: 0.5, slowLvl: 0.015, detect: true, frail: 0.12, frailLvl: 0.08 / 9,
     desc: 'Не б’є, а холодить: усі в його тумані отримують більше урону; невидимих розкриває і сповільнює',
   },
   spider: {
@@ -84,17 +84,17 @@ const TOWERS = {
   },
   slime: {
     name: 'Слаймо-пулька', color: '#7fd65a', cost: 130,
-    damage: 70, range: 6.5, minRange: 2, rate: 3.5, projSpeed: 220, lob: true,
+    damage: 90, range: 6.5, minRange: 2, rate: 3.5, projSpeed: 220, lob: true,
     desc: 'Катапульта жбурляє важку грудку слизу дуже далеко, але під себе (ближче 2 кл.) не влучить',
   },
   vampire: {
     name: 'Вампір', color: '#c0243c', cost: 140, attack: 'drain', magic: true,
-    damage: 5, damageMax: 10, ramp: 4, rate: 1, range: 2.5, dmgLvl: 1.2, targets: 1, targetLvls: [4, 7, 10],
+    damage: 5, damageMax: 10, ramp: 4, rate: 1, range: 2.5, targets: 1, targetLvls: [4, 7, 10],
     desc: 'Висмоктує кров: що довше тримає ціль, то сильніше (5 → 10 урону/с за 4 с); з рівнем — до 4 цілей',
   },
   plate: {
     name: 'Живі лати', color: '#8c96a8', cost: 110, attack: 'cleave',
-    damage: 26, range: 1.3, rate: 1.2, cleave: 0.8, cleaveLvl: 0.03,
+    damage: 30, range: 1.3, rate: 1.2, cleave: 0.8, cleaveLvl: 0.03, dmgLvl: 1.2,
     desc: 'Порожні лати рубають найближчого; легких авантюристів, що йдуть впритул до нього, зачіпає тим самим ударом',
   },
   witch: {
@@ -115,7 +115,6 @@ const TOWERS = {
 //   armor      — віднімається від кожного удару (але лишається щонайменше 20% урону); отрута ігнорує броню
 //   shield     — частка maxHp, яку спершу поглинає магічний щит
 //   shieldRegen — частка щита за секунду, що відновлюється, поки авантюриста SHIELD_REGEN_DELAY с не били
-//                 (отрута теж «б'є» — тому павук добре знімає магів)
 //   slowImmune — холод привида не діє
 //   haste      — аура прискорення: сусідів у radius (кл.) пришвидшує в mul раз (не складається, на таких самих не діє)
 //   countMul   — у генерованих набігах таких менше (множник кількості в загоні)
@@ -146,14 +145,14 @@ const ENEMIES = {
   priest: { name: 'Жрець',   color: '#e8e0d0', hp: 60,  speed: 50,  reward: 10, radius: 10, light: true,
             heal: { radius: 1.5, amount: 0.06, every: 2 },
             desc: 'Молитвою лікує себе й усіх поруч — убивай першим' },
-  mage:   { name: 'Бойовий маг', color: '#5a3fa0', hp: 80, speed: 55, reward: 12, radius: 10, light: true,
-            shield: 0.35, shieldRegen: 0.12, slowImmune: true, magicImmune: true,
-            desc: 'Розсіює будь-яку магію (імп, лич, біхолдер, вампір); щит відновлюється, якщо мага 2 с не били' },
+  mage:   { name: 'Бойовий маг', color: '#5a3fa0', hp: 70, speed: 55, reward: 12, radius: 10, light: true,
+            slowImmune: true, magicImmune: true,
+            desc: 'Розсіює будь-яку магію: імп, лич, біхолдер і вампір йому нічого не зроблять; холод не діє' },
   scout:  { name: 'Ельф-розвідник', color: '#3f6f5a', hp: 35, speed: 120, reward: 8, radius: 8, stealth: true,
             desc: 'Невидимий: його видно лише поруч із привидом чи оком' },
-  knight: { name: 'Вершник', color: '#9aa4b0', hp: 180, speed: 75,  reward: 18, radius: 14, armor: 2, lifeDmg: 2, spawn: 'normal',
+  knight: { name: 'Вершник', color: '#9aa4b0', hp: 160, speed: 75,  reward: 18, radius: 14, armor: 2, lifeDmg: 2, spawn: 'normal',
             desc: 'Швидкий і міцний, прорвавшись, б’є Серце вдвічі сильніше; збитий з коня, лишає воїна' },
-  jester: { name: 'Шут', color: '#c23a5a', hp: 90, speed: 70, reward: 0, radius: 11, stealth: true,
+  jester: { name: 'Шут', color: '#c23a5a', hp: 60, speed: 70, reward: 0, radius: 11, stealth: true,
             split: 2, splitReward: 2,
             desc: 'Невидимий блазень: гинучи, розпадається на двох менших, а ті — ще на двох' },
   blade:  { name: 'Майстер меча', color: '#b8c4d4', hp: 60, speed: 65, reward: 10, radius: 10, deflect: 0.5,
@@ -280,6 +279,6 @@ function waveGroups(n) {
 
 // Множники сили й нагороди авантюристів на набігу n.
 // Після кампанії HP росте ще й експоненційно — безкінечний режим рано чи пізно ламає будь-яку оборону.
-const hpMul = n => (1 + 0.12 * (n - 1) + 0.003 * (n - 1) ** 2) * 1.02 ** Math.max(0, n - CAMPAIGN_WAVES);
+const hpMul = n => (1 + 0.12 * (n - 1) + 0.0019 * (n - 1) ** 2) * 1.02 ** Math.max(0, n - CAMPAIGN_WAVES);
 const rewardMul = n => 1 + 0.008 * (n - 1);
 const speedMul = n => 1 + Math.min(0.3, 0.003 * (n - 1));   // авантюристи досвідченішають: до +30% швидкості

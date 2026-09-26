@@ -318,18 +318,19 @@ function refreshUpgrade() {
     const now = towerStats(def, t.level);
     const next = maxed ? null : towerStats(def, t.level + 1);
     const attack = def.attack || 'projectile';
-    // що росте з рівнем — одним реченням
-    const grows = {
-      web: 'павутина тримає довше, летить далі, постріли частіші',
-      haunt: 'туман ширший, крихкість сильніша, невидимі мерзнуть дужче',
-      drain: `урон +${Math.round((def.dmgLvl - 1) * 100)}%, розгін швидший, ще ціль на ${def.targetLvls.join('/')} рівнях`,
-      buff: `зілля сильніше на ${Math.round(def.buffLvl * 100)}%`,
-      manual: `валун відкидає далі, ще валун на ${def.targetLvls.join(' і ')} рівнях`,
-    }[attack] || [
-      def.dmgLvl !== 1 && `урон +${Math.round(((def.dmgLvl || LVL_DMG) - 1) * 100)}%`,
+    // що росте з рівнем — одним реченням (функції, бо поля на кшталт targetLvls є не в усіх)
+    const dmgUp = `урон +${Math.round(((def.dmgLvl || LVL_DMG) - 1) * 100)}%`;
+    const grows = ({
+      web: () => 'павутина тримає довше, летить далі, постріли частіші',
+      haunt: () => 'туман ширший, крихкість сильніша, невидимі мерзнуть дужче',
+      drain: () => `${dmgUp}, розгін швидший, ще ціль на ${def.targetLvls.join('/')} рівнях`,
+      buff: () => `зілля сильніше на ${Math.round(def.buffLvl * 100)}%`,
+      manual: () => `валун відкидає далі, ще валун на ${def.targetLvls.join(' і ')} рівнях`,
+    }[attack] || (() => [
+      def.dmgLvl !== 1 && dmgUp,
       `дальність +${+(def.rangeLvl ?? LVL_RANGE).toFixed(2)} кл.`,
       `атака на ${Math.round((1 - (def.rateLvl || LVL_RATE)) * 100)}% частіше`,
-    ].filter(Boolean).join(', ');
+    ].filter(Boolean).join(', ')))();
     $('upDesc').textContent = maxed ? `${def.desc}. Монстр досяг найвищого рівня.` : `${def.desc}. Посилення: ${grows}.`;
 
     const rows = [];
@@ -343,7 +344,7 @@ function refreshUpgrade() {
       stat('Перезарядка', s => s.rate.toFixed(2) + 'с');
       fixed('Конус', def.cone + '°');
     } else if (attack === 'drain') {
-      stat('Урон/с', s => `${Math.round(s.damage)} → ${Math.round(s.damageMax)}`);
+      stat('Урон/с', s => `${Math.round(s.damage)}…${Math.round(s.damageMax)}`);
       stat('Розгін', s => (def.ramp * s.rate).toFixed(1) + 'с');
       stat('Цілей', s => s.targets);
       stat('Дальність', range);
