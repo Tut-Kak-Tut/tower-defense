@@ -198,7 +198,7 @@ new MonsterBuilder('slime')
   .setLevel(7, { upgradeCost: 500, damage: 200, minRange: 3.0})
   .setLevel(8, { upgradeCost: 600, damage: 300, minRange: 3.0})
   .setLevel(9, { upgradeCost: 700, damage: 350, minRange: 3.0})
-  .setLevel(10, { upgradeCost: 1000, damage: 500, minRange: 3.0 , rate: 10})
+  .setLevel(10, { upgradeCost: 1000, damage: 500, minRange: 3.0 , rate: 6})
   .build();
 
 new MonsterBuilder('plate')
