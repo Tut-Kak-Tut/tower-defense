@@ -32,6 +32,15 @@ function segDist(px, py, x1, y1, x2, y2) {
 
 const alive = e => !e.dead && !e.escaped;
 
+// Чи є на полі хтось, заради кого носій прапора e не може впасти (інші носії не рахуються).
+const hasGuards = (e, game) => game.enemies.some(o => o !== e && alive(o) && !o.def.undying);
+
+// Паладини, чия аура щита накриває e (сам e — ні).
+function shieldGuards(e) {
+  return game.enemies.filter(g => g !== e && g.def.shieldAura && g.shield > 0 && alive(g)
+    && Math.hypot(g.x - e.x, g.y - e.y) <= g.def.shieldAura * CELL);
+}
+
 // Сторони світу для променя біхолдера: індекс = tower.dir, кут = dir * π/2.
 const DIRS = [
   { dx: 1, dy: 0, name: 'праворуч' }, { dx: 0, dy: 1, name: 'вниз' },
@@ -79,9 +88,9 @@ class Enemy {
     this.slowTimer = 0;
     this.stunTimer = 0;
     this.webbed = false;   // стоїть через павутину павука (кокон замість зірочок)
-    this.hasted = 0;       // секунди прискорення від паладина поруч
+    this.hasted = 0;       // секунди прискорення від носія прапора поруч
     this.hasteMul = 1;
-    this.lastStand = !!def.lastStand; // гном ще не використав «друге життя»
+    this.guarded = false;  // носій прапора зараз безсмертний (є союзники) — для малювання
     this.summoned = false; // з'явився з іншого авантюриста, а не з черги набігу
     this.gen = 0;          // покоління шута: 0 — цілий, def.split — найменші
     this.poisonDps = 0;
@@ -96,7 +105,7 @@ class Enemy {
 
   get hidden() { return this.stealth && this.revealed <= 0; }
 
-  // поточна швидкість ходу: сповільнення та прискорення паладина (не складається з іншими)
+  // поточна швидкість ходу: сповільнення та прискорення носія прапора (не складається з іншими)
   get speed() {
     return this.stunTimer > 0 ? 0 : this.baseSpeed * this.slowFactor * (this.hasted > 0 ? this.hasteMul : 1);
   }
@@ -105,7 +114,7 @@ class Enemy {
     if (this.revealed > 0) this.revealed -= dt;
     if (this.hasted > 0) this.hasted -= dt;
     if (this.def.haste) {
-      // бойовий клич паладина: пришвидшує всіх поруч, крім інших паладинів
+      // стяг носія прапора: пришвидшує всіх поруч, крім інших носіїв
       const h = this.def.haste, rad = h.radius * CELL;
       for (const e of game.enemies) {
         if (e.def.haste || !alive(e) || Math.hypot(e.x - this.x, e.y - this.y) > rad) continue;
@@ -113,6 +122,7 @@ class Enemy {
         e.hasteMul = h.mul;
       }
     }
+    if (this.def.undying) this.guarded = hasGuards(this, game);
     if (this.frailTimer > 0 && (this.frailTimer -= dt) <= 0) this.frail = 0;
     this.sinceHit += dt;
     if (this.def.shieldRegen && this.sinceHit >= SHIELD_REGEN_DELAY) {
@@ -212,29 +222,38 @@ class Enemy {
   hit(damage, pierce = false, src = null) {
     if (src && TOWERS[src].armorPierce) pierce = true;
     if (this.dead) return;
-    if (this.def.magicImmune && src && TOWERS[src].magic) {
-      // бойовий маг розсіює будь-яку магію — лише іскри
-      game.effects.push({ kind: 'spark', x: this.x, y: this.y, t: 0.25, max: 0.25, color: '#c78cff' });
-      return;
-    }
+    const magic = !!(src && TOWERS[src].magic);
     this.sinceHit = 0;
     damage *= 1 + this.frail;
-    if (!pierce && this.armor) damage = Math.max(damage * 0.2, damage - this.armor);
+    if (magic) {
+      // магічний щит бойового мага поруч (чи власний) — найсильніший, не складаються
+      let cut = 0;
+      for (const e of game.enemies) {
+        const w = e.def.magicWard;
+        if (w && alive(e) && Math.hypot(e.x - this.x, e.y - this.y) <= w.radius * CELL) cut = Math.max(cut, w.cut);
+      }
+      if (cut) {
+        damage *= 1 - cut;
+        if (Math.random() < 0.3) game.effects.push({ kind: 'spark', x: this.x, y: this.y, t: 0.25, max: 0.25, color: '#c78cff' });
+      }
+    }
+    if (!pierce && this.armor && !(magic && this.def.physArmor)) damage = Math.max(damage * 0.2, damage - this.armor);
     let dealt = 0;
-    if (this.shield > 0) {
-      const absorbed = Math.min(this.shield, damage);
-      this.shield -= absorbed;
+    // спершу — власний щит, потім щит паладина, в ауру якого потрапив
+    for (const g of [this, ...shieldGuards(this)]) {
+      if (damage <= 0) break;
+      if (g.shield <= 0) continue;
+      const absorbed = Math.min(g.shield, damage);
+      g.shield -= absorbed;
+      g.sinceHit = 0;
       damage -= absorbed;
       dealt += absorbed;
     }
-    dealt += Math.min(damage, this.hp);
+    const before = this.hp;
     this.hp -= damage;
-    if (this.hp <= 0 && this.lastStand) {
-      // гном уперто лишається на ногах з 1 HP — лише раз
-      this.lastStand = false;
-      this.hp = 1;
-      game.effects.push({ kind: 'spark', x: this.x, y: this.y, t: 0.5, max: 0.5, color: '#ffd86b' });
-    }
+    // носій прапора не падає, поки за ним є кому йти
+    if (this.hp < 1 && this.def.undying && hasGuards(this, game)) this.hp = Math.min(before, 1);
+    dealt += Math.max(0, before - Math.max(0, this.hp));
     if (this.hp <= 0) this.dead = true;
     const st = src && game.stats[src];
     if (st) {
@@ -284,8 +303,29 @@ class Enemy {
     drawAdventurer(ctx, this.type, r, this.color);
     ctx.restore();
 
+    if (this.def.shieldAura && this.shield > 0) {
+      // щит паладина накриває сусідів — блакитне коло
+      ctx.beginPath();
+      ctx.arc(this.x, this.y, this.def.shieldAura * CELL, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(90, 140, 255, 0.06)';
+      ctx.fill();
+      ctx.strokeStyle = `rgba(140, 180, 255, ${0.3 + Math.sin(time * 3) * 0.1})`;
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+    }
+    if (this.def.magicWard) {
+      // магічний щит бойового мага — фіолетове коло
+      ctx.beginPath();
+      ctx.arc(this.x, this.y, this.def.magicWard.radius * CELL, 0, Math.PI * 2);
+      ctx.strokeStyle = `rgba(199, 140, 255, ${0.25 + Math.sin(time * 4 + 1) * 0.08})`;
+      ctx.lineWidth = 1;
+      ctx.setLineDash([4, 4]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+
     if (this.def.haste) {
-      // аура бойового клича паладина — золоте коло
+      // аура стяга носія прапора — золоте коло
       ctx.beginPath();
       ctx.arc(this.x, this.y, this.def.haste.radius * CELL, 0, Math.PI * 2);
       ctx.strokeStyle = `rgba(230, 195, 92, ${0.18 + Math.sin(time * 4) * 0.06})`;
@@ -377,6 +417,12 @@ class Enemy {
       ctx.fillStyle = '#7fa8ff';
       ctx.fillRect(x, y - 3, w * this.shield / this.maxShield, 2);
     }
+    if (this.guarded) {
+      // безсмертний носій прапора — золота рамка смужки
+      ctx.strokeStyle = '#ffd86b';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(x - 0.5, y - 0.5, w + 1, h + 1);
+    }
   }
 }
 
@@ -436,9 +482,9 @@ class Tower {
     return s;
   }
 
-  // Чи може цей монстр атакувати авантюриста: невидимих — лише з detect, магія не бере бойового мага.
+  // Чи може цей монстр атакувати авантюриста: невидимих — лише з detect.
   canHit(e) {
-    return alive(e) && (!e.hidden || this.def.detect) && !(this.def.magic && e.def.magicImmune);
+    return alive(e) && (!e.hidden || this.def.detect);
   }
 
   get damage() { return this.stats().damage; }
@@ -857,6 +903,27 @@ function drawAdventurer(ctx, type, r, color) {
       ellipse(-r * 0.3, 0, r * 0.14, r * 0.14, '#2a1e18');      // вузол на потилиці
       ctx.fillStyle = '#b22a2a';                                // червона пов'язка
       ctx.fillRect(r * 0.05, -r * 0.38, 2, r * 0.76);
+      break;
+    }
+
+    case 'banner': {
+      // древко вздовж руки, стяг за спиною майорить
+      ctx.fillStyle = '#6b4a2b';
+      ctx.fillRect(-r * 1.1, r * 0.55 - 1, r * 1.6, 2);
+      const wave = Math.sin(time * 6) * r * 0.15;
+      ctx.beginPath();
+      ctx.moveTo(-r * 0.3, r * 0.55);
+      ctx.quadraticCurveTo(-r * 0.7, r * 0.9 + wave, -r * 1.1, r * 1.35);
+      ctx.lineTo(-r * 1.1, r * 0.55);
+      ctx.closePath();
+      ctx.fillStyle = '#c23a2e';
+      ctx.fill();
+      ctx.fillStyle = '#ffd86b';                                // вістря древка
+      ctx.beginPath();
+      ctx.arc(r * 0.55, r * 0.55, 2, 0, Math.PI * 2);
+      ctx.fill();
+      body();
+      helmet('#b8a070');
       break;
     }
 

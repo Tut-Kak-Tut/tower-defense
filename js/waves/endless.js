@@ -4,7 +4,7 @@
 //
 // ЯК ГЕНЕРАТОР БУДУЄ НАБІГ n
 //   - кожен setBossEvery-й (10-й) — бос-набіг: два випадкові загони, далі герой в оточенні (вершник/гном/паладин
-//     попереду, жрець і маг позаду); героїв +1 кожні setHeroesEvery (50) набігів;
+//     попереду, жрець і маг позаду; жрець — лише з паладином); героїв +1 кожні setHeroesEvery (50) набігів;
 //   - кожен setThemeEvery-й (5-й) — тематичний: один і той самий загін раз за разом;
 //   - решта — випадкові загони, поки не набереться «загроза» набігу = setBudget × розмір набігу
 //     (загроза авантюриста = HP × швидкість/60 × удар по Серцю; розмір росте за setWaveSize);
@@ -57,6 +57,10 @@ class EndlessBuilder {
     if (!this.squads.length) fail('немає жодного загону (addSquad)');
     for (const s of this.squads) {
       for (const [t] of s.units) if (!ENEMIES[t]) fail(`загін '${s.name}': авантюриста '${t}' немає`);
+      for (const [t] of s.units) {
+        const esc = ENEMIES[t].escort;
+        if (esc && !s.units.some(([u]) => u === esc)) fail(`загін '${s.name}': '${t}' ходить лише разом із '${esc}'`);
+      }
     }
     return new Endless(this);
   }
@@ -94,7 +98,9 @@ class Endless {
       add(pick(2).units);
       const guard = open('knight') ? 'knight' : open('gnome') ? 'gnome' : 'tank';
       const rear = ['priest', 'mage'].filter(open);
-      add([[guard, 1], ['hero', 1 + Math.floor((n - 1) / this.heroesEvery)], ...rear.map(t => [t, 1])]);
+      // супровід тилу (жрець — з паладином), якого ще немає в авангарді
+      const escorts = [...new Set(rear.map(t => ENEMIES[t].escort).filter(t => t && t !== guard))];
+      add([[guard, 1], ...escorts.map(t => [t, 1]), ['hero', 1 + Math.floor((n - 1) / this.heroesEvery)], ...rear.map(t => [t, 1])]);
       return groups;
     }
     const budget = this.budget * size;
@@ -145,10 +151,12 @@ const ENDLESS = new EndlessBuilder()
   .addSquad('Класична партія', [['tank', 1], ['fast', 1], ['mage', 1], ['priest', 1]])
   .addSquad('Тіньова група', [['scout', 2], ['fast', 2]])
   .addSquad('Кавалерійський наскок', [['knight', 1], ['scout', 1]])
-  .addSquad('Велика експедиція', [['knight', 1], ['gnome', 1], ['normal', 2], ['mage', 1], ['priest', 1]])
+  .addSquad('Велика експедиція', [['knight', 1], ['tank', 1], ['normal', 2], ['mage', 1], ['priest', 1]])
   .addSquad('Мандрівний цирк', [['jester', 1], ['fast', 2]])
   .addSquad('Школа меча', [['blade', 2], ['normal', 2]])
-  .addSquad('Легендарний загін', [['knight', 1], ['blade', 2], ['jester', 1], ['priest', 1]])
+  .addSquad('Легендарний загін', [['knight', 1], ['tank', 1], ['blade', 2], ['jester', 1], ['priest', 1]])
+  .addSquad('Штандарт', [['normal', 3], ['banner', 1]])
+  .addSquad('Прапор над походом', [['tank', 1], ['normal', 2], ['banner', 1], ['priest', 1]])
   .build();
 
 checkCampaign();

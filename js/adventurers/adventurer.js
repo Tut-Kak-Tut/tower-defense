@@ -70,14 +70,17 @@ class AdventurerBuilder {
   }
   setBig(on = true) { return this.set('big', on); }                 // удар лат по площі зачіпає лише на частку splashBig
   setSlowImmune(on = true) { return this.set('slowImmune', on); }   // холод привида не діє
-  setMagicImmune(on = true) { return this.set('magicImmune', on); } // магічні атаки (monster.magic) не завдають урону
+  setPhysicalArmor(on = true) { return this.set('physArmor', on); } // броня тримає лише фізичні удари, магія (monster.magic) — крізь неї
   setSteadfast(on = true) { return this.set('steadfast', on); }     // валун орка не відкидає
-  setLastStand(on = true) { return this.set('lastStand', on); }     // перший смертельний удар лишає 1 HP
+  setUndying(on = true) { return this.set('undying', on); }         // не гине (лишається 1 HP), поки на полі є союзник без setUndying
   setDeflect(chance) { return this.set('deflect', chance); }        // шанс відбити снаряд (промені й аури — ні)
   setStealth(on = true) { return this.set('stealth', on); }         // невидимий: б'ють лише монстри з detect
 
   // --- уміння ---
   setHaste(radiusCells, mul) { return this.set('haste', { radius: radiusCells, mul }); } // пришвидшує сусідів (не складається)
+  setShieldAura(radiusCells) { return this.set('shieldAura', radiusCells); } // щит (setShield) поглинає урон і по всіх поруч
+  setMagicWard(radiusCells, cut) { return this.set('magicWard', { radius: radiusCells, cut }); } // магічний урон по всіх поруч (і по собі) × (1 − cut)
+  setEscort(type) { return this.set('escort', type); }             // у набігах іде лише в загоні, де є type (перевіряють WaveBuilder і EndlessBuilder)
   setHeal(radiusCells, part, everySec) { return this.set('heal', { radius: radiusCells, amount: part, every: everySec }); } // лікує себе й сусідів
   setSpawnOnDeath(type) { return this.set('spawn', type); }         // хто з'являється позаду, коли цей гине (оголосити раніше)
   setSplit(times, rewardEach) {                                     // гинучи, ділиться на двох з половиною HP, times разів;
@@ -97,6 +100,7 @@ class AdventurerBuilder {
     if (this.unlock > CAMPAIGN_WAVES && this.unlock % 5 === 0) {
       fail(`набіг появи ${this.unlock} кратний 5 — там тематичні й бос-набіги, новачок не потрапить першим`);
     }
+    if (p.escort && !ENEMIES[p.escort]) fail(`setEscort('${p.escort}'): такого авантюриста ще не оголошено вище`);
     if (p.spawn && !ENEMIES[p.spawn]) fail(`setSpawnOnDeath('${p.spawn}'): такого авантюриста ще не оголошено вище`);
 
     for (const [n, stats] of Object.entries(this.waves)) {

@@ -14,7 +14,7 @@ HTML5 Canvas + чистий JavaScript, без збірки і залежнос�
 `wave` = набіг. Монстри: `archer` скелет-лучник, `cannon` вогняний імп, `frost` привид, `spider` павук,
 `golem` голем, `lich` лич, `eye` біхолдер, `slime` слаймо-пулька, `vampire` вампір, `plate` живі лати, `witch` котел відьми,
 `orc` орк-швиряка, `grave` кладовище. Авантюристи: `normal` воїн, `fast` злодій, `tank` паладин, `gnome` гном,
-`priest` жрець, `mage` маг, `scout` розвідник, `knight` вершник, `jester` шут, `blade` майстер меча, `hero` герой-бос.
+`banner` носій прапора, `priest` жрець, `mage` маг, `scout` розвідник, `knight` вершник, `jester` шут, `blade` майстер меча, `hero` герой-бос.
 
 ## Структура
 - `js/config.js` — загальне: мапа/шлях, факели, `MAX_TOWERS`, `MAX_LEVEL`, `CAMPAIGN_WAVES`, `hash()`.
@@ -25,6 +25,7 @@ HTML5 Canvas + чистий JavaScript, без збірки і залежнос�
 - `js/monsters/monsters.js` — самі монстри: по ланцюжку `new MonsterBuilder(id)…build()` на кожного. Баланс монстрів правити тут.
 - `js/adventurers/adventurer.js` — `Adventurer` (вид авантюриста) і `AdventurerBuilder`; реєстри `ENEMIES`, `ENEMY_UNLOCK`, `SPAWN_GAP` заповнює `build()`
   (перевіряє обов'язкові поля, набіг появи після 10-го не кратний 5, `setSpawnOnDeath` — лише на вже оголошеного).
+  `setEscort(type)` — ходить лише в загоні з `type` (жрець — з паладином); перевіряють `WaveBuilder.build()` і `EndlessBuilder.build()`.
 - `js/adventurers/adventurers.js` — самі авантюристи ланцюжками `new AdventurerBuilder(id)…build()`; порядок = порядок у бестіарії.
   Сила з набігами — опорні точки `setWave(n, {hp, speed, reward, armor, splitReward})`: між ними лінійно, після останньої —
   тим самим темпом (`Adventurer.statsAt(n)`); точки згенеровані зі старої кривої HP `1 + 0.12(n−1) + 0.0019(n−1)²`.
@@ -38,9 +39,10 @@ HTML5 Canvas + чистий JavaScript, без збірки і залежнос�
 - `js/entities.js` — `towerStats(def, level)` (усі характеристики на рівні — і для гри, і для UI; `Tower.stats()` — те саме
   з бафами відьми `tower.buffs`, у грі брати його), `targetsAt()` (цілі/валуни на рівні), `Enemy`
   (`setProgress(p)` ставить на будь-яке місце шляху за `PATH_LEN`; `spawnOnDeath()` — воїн вершника, половинки шута,
-  їм ставиться `summoned` і `origin` — панель набігу рахує за `origin`; `speed` — з прискоренням паладина `hasted`;
-  `lastStand` гнома; магія: `hit()` нічого не робить `magicImmune`, якщо `TOWERS[src].magic`, а `Tower.canHit(e)` — хто
-  кого взагалі може цілити),
+  їм ставиться `summoned` і `origin` — панель набігу рахує за `origin`; `speed` — з прискоренням носія прапора `hasted`;
+  носій прапора `undying` не падає нижче 1 HP, поки живий хтось не-`undying` (`hasGuards`); щит паладина `shieldAura`
+  поглинає урон і по сусідах (`shieldGuards`); `magicWard` мага ріже магічний урон (`TOWERS[src].magic`) поруч;
+  броня `physArmor` (гном) не діє проти магії; `Tower.canHit(e)` — хто кого взагалі може цілити),
   (броня/щит/отрута/лікування/оглушення/невидимість через `hidden`/`revealed`), `Tower` (атаки `projectile`/`aura`/`beam`/`web` — павук раз на `rate` стріляє павутиною в конус `cone` перед собою — усі в ньому стоять `hold` с через `stun(t, webbed)` (кокон замість зірочок, ефект `cone`), без урону; з рівнем ростуть утримання, дальність і частота,
   детектори підсвічують невидимих; біхолдер `fixedDir` б'є смугою `beamWidth` у бік `dir` з `DIRS`, зона дії — `reaches(e)`
   (з мертвою зоною `minRange`); `haunt` привида, `drain` вампіра (`links` + `drawLinks`), `cleave` лат (ближній удар + фізичний сплеш `splash` навколо цілі), `buff`, `manual` і `grave` —

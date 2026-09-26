@@ -50,6 +50,18 @@ class WaveBuilder {
       if (!(interval >= 0)) fail(`${where}: інтервал — число від 0`);
       if (buff) checkBuff(buff, where);
     });
+    // хто ходить лише в супроводі (setEscort) — у його загоні має бути супровідник
+    const squads = [];
+    this.groups.forEach(([type, , , pause], i) => {
+      if (i === 0 || pause !== undefined) squads.push([]);
+      squads[squads.length - 1].push(type);
+    });
+    squads.forEach((types, i) => {
+      for (const t of types) {
+        const esc = ENEMIES[t].escort;
+        if (esc && !types.includes(esc)) fail(`загін ${i + 1}: '${t}' ходить лише разом із '${esc}'`);
+      }
+    });
     WAVES[n] = { groups: this.groups, buff: this.waveBuff };
   }
 }

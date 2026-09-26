@@ -289,9 +289,12 @@ function enemyTraits(def) {
   if (def.armor) t.push(`броня ${def.armor}`);
   if (def.shield) t.push(`щит ${Math.round(def.shield * 100)}%${def.shieldRegen ? ' (відновлюється)' : ''}${def.shieldWave ? ` з ${def.shieldWave}-го набігу` : ''}`);
   if (def.slowImmune) t.push('не мерзне');
+  if (def.physArmor) t.push('броня лише від фізичних ударів');
+  if (def.shieldAura) t.push('щит накриває сусідів');
   if (def.haste) t.push(`пришвидшує сусідів на ${Math.round((def.haste.mul - 1) * 100)}%`);
-  if (def.lastStand) t.push('переживає смертельний удар');
-  if (def.magicImmune) t.push('не відчуває магії');
+  if (def.undying) t.push('не гине, поки є союзники');
+  if (def.magicWard) t.push(`магічний щит −${Math.round(def.magicWard.cut * 100)}% магії поруч`);
+  if (def.escort) t.push(`ходить лише з: ${ENEMIES[def.escort].name.toLowerCase()}`);
   if (def.spawn) t.push(`гинучи, лишає: ${ENEMIES[def.spawn].name.toLowerCase()}`);
   if (def.split) t.push(`ділиться ${def.split} рази`);
   if (def.deflect) t.push(`відбиває ${Math.round(def.deflect * 100)}% снарядів`);
@@ -416,7 +419,7 @@ function refreshUpgrade() {
       if (def.stun) stat('Оглушення', s => `${Math.round(s.stunChance * 100)}% · ${def.stun}с`);
       if (attack === 'beam') fixed('Промінь', def.fixedDir ? 'смуга' : 'крізь усіх');
     }
-    if (def.magic) fixed('Магія', 'маг не відчуває');
+    if (def.magic) fixed('Магія', 'маг послаблює, лати не тримають');
     if (def.armorPierce) fixed('Броня', 'ігнорує');
     for (const b of t.buffs) fixed(b.kind === 'rate' ? 'Зілля швидкості' : 'Зілля сили', `+${Math.round(b.v * 100)}%`);
     if (def.detect) fixed('Підсвічує невидимих', 'так');
