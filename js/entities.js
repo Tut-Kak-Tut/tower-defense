@@ -88,6 +88,10 @@ class Enemy {
     this.slowTimer = 0;
     this.stunTimer = 0;
     this.webbed = false;   // стоїть через павутину павука (кокон замість зірочок)
+    this.hasted = 0;       // секунди прискорення від паладина поруч
+    this.hasteMul = 1;
+    this.lastStand = !!def.lastStand; // гном ще не використав «друге життя»
+    this.summoned = false; // з'явився з іншого авантюриста, а не з черги набігу
     this.poisonDps = 0;
     this.poisonTimer = 0;
     this.poisonSrc = null; // чия отрута — для статистики
@@ -100,8 +104,23 @@ class Enemy {
 
   get hidden() { return this.stealth && this.revealed <= 0; }
 
+  // поточна швидкість ходу: сповільнення та прискорення паладина (не складається з іншими)
+  get speed() {
+    return this.stunTimer > 0 ? 0 : this.baseSpeed * this.slowFactor * (this.hasted > 0 ? this.hasteMul : 1);
+  }
+
   update(dt, game) {
     if (this.revealed > 0) this.revealed -= dt;
+    if (this.hasted > 0) this.hasted -= dt;
+    if (this.def.haste) {
+      // бойовий клич паладина: пришвидшує всіх поруч, крім інших паладинів
+      const h = this.def.haste, rad = h.radius * CELL;
+      for (const e of game.enemies) {
+        if (e.def.haste || !alive(e) || Math.hypot(e.x - this.x, e.y - this.y) > rad) continue;
+        e.hasted = 0.2;
+        e.hasteMul = h.mul;
+      }
+    }
     if (this.frailTimer > 0 && (this.frailTimer -= dt) <= 0) this.frail = 0;
     this.sinceHit += dt;
     if (this.def.shieldRegen && this.sinceHit >= SHIELD_REGEN_DELAY) {
@@ -130,12 +149,12 @@ class Enemy {
       }
     }
     if (this.stunTimer > 0) { this.stunTimer -= dt; return; }
-    let speed = this.baseSpeed * this.slowFactor;
+    let speed = this.speed;
     // стрій: наздогнавши попереднього в загоні, не обганяємо його (загиблого пропускаємо)
     while (this.leader && !alive(this.leader)) this.leader = this.leader.leader;
     const lead = this.leader;
     if (lead && lead.progress - this.progress < FORMATION_GAP) {
-      speed = Math.min(speed, lead.stunTimer > 0 ? 0 : lead.baseSpeed * lead.slowFactor);
+      speed = Math.min(speed, lead.speed);
     }
     let move = speed * dt;
     while (move > 0 && this.wp < PATH_PX.length) {
@@ -171,7 +190,18 @@ class Enemy {
 
   // Хто з'являється, коли цей авантюрист гине (воїн з-під вершника, половинки шута).
   spawnOnDeath() {
-    return [];
+    const out = [];
+    const make = (type, progress) => {
+      const e = new Enemy(type, ...this.muls);
+      e.origin = this.origin;
+      e.summoned = true;
+      e.leader = this.leader;
+      e.setProgress(progress);
+      out.push(e);
+      return e;
+    };
+    if (this.def.spawn) make(this.def.spawn, this.progress - CELL);
+    return out;
   }
 
   // pierce — урон крізь броню (отрута); src — тип монстра, якому зарахувати урон і вбивство
@@ -194,6 +224,12 @@ class Enemy {
     }
     dealt += Math.min(damage, this.hp);
     this.hp -= damage;
+    if (this.hp <= 0 && this.lastStand) {
+      // гном уперто лишається на ногах з 1 HP — лише раз
+      this.lastStand = false;
+      this.hp = 1;
+      game.effects.push({ kind: 'spark', x: this.x, y: this.y, t: 0.5, max: 0.5, color: '#ffd86b' });
+    }
     if (this.hp <= 0) this.dead = true;
     const st = src && game.stats[src];
     if (st) {
@@ -242,6 +278,26 @@ class Enemy {
     ctx.rotate(this.dir);
     drawAdventurer(ctx, this.type, r, this.color);
     ctx.restore();
+
+    if (this.def.haste) {
+      // аура бойового клича паладина — золоте коло
+      ctx.beginPath();
+      ctx.arc(this.x, this.y, this.def.haste.radius * CELL, 0, Math.PI * 2);
+      ctx.strokeStyle = `rgba(230, 195, 92, ${0.18 + Math.sin(time * 4) * 0.06})`;
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    } else if (this.hasted > 0) {
+      // пришвидшений — золоті риски позаду
+      ctx.save();
+      ctx.translate(this.x, this.y);
+      ctx.rotate(this.dir);
+      ctx.strokeStyle = 'rgba(255, 216, 107, 0.6)';
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      for (const oy of [-r * 0.5, 0, r * 0.5]) { ctx.moveTo(-r - 3, oy); ctx.lineTo(-r - 9 + Math.abs(oy) * 0.3, oy); }
+      ctx.stroke();
+      ctx.restore();
+    }
 
     if (this.shield > 0) {
       // магічний щит — мерехтлива синя сфера

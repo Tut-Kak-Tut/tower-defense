@@ -185,6 +185,7 @@ function update(dt) {
     if (e.escaped) { game.lives -= e.lifeDmg; game.heartFlash = 0.5; return false; }
     return true;
   });
+  for (const e of born) game.seen.add(e.type);
   game.enemies.push(...born);
   game.projectiles = game.projectiles.filter(p => !p.done);
   game.effects = game.effects.filter(fx => fx.t > 0);

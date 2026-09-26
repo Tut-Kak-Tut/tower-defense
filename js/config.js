@@ -84,6 +84,11 @@ const TOWERS = {
 //   shieldRegen — частка щита за секунду, що відновлюється, поки авантюриста SHIELD_REGEN_DELAY с не били
 //                 (отрута теж «б'є» — тому павук добре знімає магів)
 //   slowImmune — холод привида не діє
+//   haste      — аура прискорення: сусідів у radius (кл.) пришвидшує в mul раз (не складається, на таких самих не діє)
+//   countMul   — у генерованих набігах таких менше (множник кількості в загоні)
+//   lastStand  — перший смертельний удар лишає 1 HP
+//   magicImmune — магічні атаки (monster.magic) не завдають урону
+//   spawn      — хто з'являється на клітинку позаду, коли цей гине
 //   heal       — лікує себе й сусідів: radius (кл.), amount (частка maxHp), every (с)
 //   stealth    — невидимий: б'ють лише монстри з detect, або всі, поки він у радіусі такого монстра
 //   lifeDmg    — скільки міцності Серця знімає при прориві (за замовчуванням 1)
@@ -96,19 +101,20 @@ const ENEMIES = {
   fast:   { name: 'Злодій',  color: '#4f7a4a', hp: 22,  speed: 110, reward: 5,  radius: 8,
             desc: 'Швидкий, але крихкий' },
   tank:   { name: 'Паладин', color: '#e6c35c', hp: 160, speed: 35,  reward: 15, radius: 14,
-            desc: 'Повільний і дуже міцний' },
-  gnome:  { name: 'Гном-латник', color: '#7a6a5a', hp: 90, speed: 45, reward: 8, radius: 11, armor: 6,
-            desc: 'Важкі лати зрізають урон кожного удару — бий сильно або отрутою' },
+            slowImmune: true, haste: { radius: 1.5, mul: 1.25 }, countMul: 0.5,
+            desc: 'Повільний і дуже міцний, не мерзне; його бойовий клич пришвидшує всіх поруч' },
+  gnome:  { name: 'Гном-латник', color: '#7a6a5a', hp: 90, speed: 45, reward: 8, radius: 11, armor: 6, lastStand: true,
+            desc: 'Важкі лати зрізають урон кожного удару, а впертість дає пережити смертельний удар' },
   priest: { name: 'Жрець',   color: '#e8e0d0', hp: 60,  speed: 50,  reward: 10, radius: 10,
             heal: { radius: 1.5, amount: 0.06, every: 2 },
             desc: 'Молитвою лікує себе й усіх поруч — убивай першим' },
   mage:   { name: 'Бойовий маг', color: '#5a3fa0', hp: 80, speed: 55, reward: 12, radius: 10,
-            shield: 0.6, shieldRegen: 0.12, slowImmune: true,
-            desc: 'Магічний щит поглинає урон і відновлюється, якщо мага 2 с не били; холод на нього не діє' },
+            shield: 0.35, shieldRegen: 0.12, slowImmune: true, magicImmune: true,
+            desc: 'Розсіює будь-яку магію (імп, лич, біхолдер, вампір); щит відновлюється, якщо мага 2 с не били' },
   scout:  { name: 'Ельф-розвідник', color: '#3f6f5a', hp: 35, speed: 120, reward: 8, radius: 8, stealth: true,
             desc: 'Невидимий: його видно лише поруч із привидом чи оком' },
-  knight: { name: 'Вершник', color: '#9aa4b0', hp: 180, speed: 75,  reward: 18, radius: 14, armor: 2, lifeDmg: 2,
-            desc: 'Швидкий і міцний, прорвавшись, б’є Серце вдвічі сильніше' },
+  knight: { name: 'Вершник', color: '#9aa4b0', hp: 180, speed: 75,  reward: 18, radius: 14, armor: 2, lifeDmg: 2, spawn: 'normal',
+            desc: 'Швидкий і міцний, прорвавшись, б’є Серце вдвічі сильніше; збитий з коня, лишає воїна' },
   hero:   { name: 'Герой',   color: '#d4a82a', hp: 500, speed: 30, reward: 100, radius: 17,
             armor: 4, shield: 0.25, lifeDmg: 5, boss: true,
             desc: 'Легендарний бос: броня, щит, величезне здоров’я' },
@@ -128,10 +134,10 @@ const FIRST_WAVES = [
   [['normal', 4, 0.8], ['fast', 3, 0.5, 2.5], ['normal', 4, 0.8, 2.5], ['fast', 3, 0.5, 2.5]],
   [['fast', 4, 0.45], ['fast', 4, 0.45, 2.5], ['fast', 4, 0.45, 2.5]],
   [['normal', 4, 0.7], ['tank', 1, 1, 3], ['normal', 3, 0.7], ['tank', 1, 1, 3], ['normal', 3, 0.7]],
-  [['fast', 5, 0.4], ['tank', 2, 1.5, 2.5], ['normal', 3, 0.7], ['fast', 5, 0.4, 2.5]],
-  [['tank', 1, 1], ['normal', 4, 0.5], ['tank', 1, 1, 2.5], ['normal', 4, 0.5], ['tank', 1, 1, 2.5], ['normal', 4, 0.5]],
-  [['fast', 8, 0.3], ['tank', 2, 1.2, 2.5], ['normal', 3, 0.5], ['fast', 8, 0.3, 2.5], ['tank', 1, 1, 2.5]],
-  [['tank', 2, 1], ['normal', 7, 0.4], ['tank', 2, 1, 2.5], ['normal', 7, 0.4], ['tank', 2, 1, 2.5]],
+  [['fast', 5, 0.4], ['tank', 1, 1.5, 2.5], ['normal', 3, 0.7], ['fast', 5, 0.4, 2.5]],
+  [['tank', 1, 1], ['normal', 4, 0.5], ['normal', 4, 0.5, 2.5], ['tank', 1, 1, 2.5], ['normal', 4, 0.5]],
+  [['fast', 8, 0.3], ['tank', 1, 1.2, 2.5], ['normal', 3, 0.5], ['fast', 8, 0.3, 2.5], ['tank', 1, 1, 2.5]],
+  [['tank', 1, 1], ['normal', 7, 0.4], ['tank', 1, 1, 2.5], ['normal', 7, 0.4], ['normal', 4, 0.4, 2.5]],
   [['normal', 5, 0.5], ['normal', 5, 0.5, 2.5], ['tank', 1, 1, 3], ['hero', 1, 1], ['normal', 3, 0.5]],
 ];
 
@@ -140,7 +146,7 @@ const FIRST_WAVES = [
 const ENEMY_UNLOCK = { normal: 1, fast: 3, tank: 5, gnome: 11, priest: 14, mage: 18, scout: 23, knight: 27 };
 // Інтервал появи всередині групи (с) до скорочення з набігами.
 const SPAWN_GAP = {
-  normal: 0.7, fast: 0.45, tank: 1.3, gnome: 1.0, priest: 1.0, mage: 1.0, scout: 0.6, knight: 1.2, hero: 2,
+  normal: 0.7, fast: 0.45, tank: 1.6, gnome: 1.0, priest: 1.0, mage: 1.0, scout: 0.6, knight: 1.2, hero: 2,
 };
 
 // Шаблони загонів у порядку строю: авангард (паладин/гном/вершник) → основа (воїни) → тил (жрець/маг).
@@ -170,8 +176,9 @@ function hash(a, b, seed = 0) {
 // «Розмір набігу»: швидко росте до 38-го, далі повільніше, але без стелі — інакше пізні набіги стають легкими.
 const waveSize = n => n <= 38 ? 1 + n * 0.08 : 4.04 + (n - 38) * 0.03;
 // «Загроза» загону: HP × швидкість (відносно воїна) × удар по Серцю — швидких і вершників у набігу менше.
-const threat = t => ENEMIES[t].hp * ENEMIES[t].speed / 60 * (ENEMIES[t].lifeDmg || 1);
-const squadMass = s => s.units.reduce((m, [t, c]) => m + threat(t) * c, 0);
+const threat = t => ENEMIES[t].hp * ENEMIES[t].speed / 60 * (ENEMIES[t].lifeDmg || 1)
+  + (ENEMIES[t].spawn ? threat(ENEMIES[t].spawn) : 0);
+const squadMass = s => s.units.reduce((m, [t, c]) => m + threat(t) * c * (ENEMIES[t].countMul || 1), 0);
 
 // Склад набігу n (з 1).
 function waveGroups(n) {
@@ -186,7 +193,7 @@ function waveGroups(n) {
   const gap = +(2.5 * fast).toFixed(2);                   // пауза між загонами
   const groups = [];
   const add = (units, mul = 1) => units.forEach(([t, c], i) => {
-    const count = t === 'hero' ? c : Math.max(1, Math.round(c * sq * mul));  // героїв не множимо
+    const count = t === 'hero' ? c : Math.max(1, Math.round(c * sq * mul * (ENEMIES[t].countMul || 1))); // героїв не множимо
     const g = [t, count, +(SPAWN_GAP[t] * fast).toFixed(2)];
     if (i === 0) g.push(gap);
     groups.push(g);

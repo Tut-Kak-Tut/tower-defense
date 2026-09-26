@@ -238,7 +238,7 @@ function refreshRaid() {
     r.row.classList.toggle('locked', !known);
     if (game.waveActive) {
       const left = game.spawnQueue.filter(s => s.type === type).length +
-        game.enemies.filter(e => e.type === type).length;
+        game.enemies.filter(e => e.origin === type).length;   // разом із тими, хто з них з'явився
       r.count.textContent = `${left} / ${r.total}`;
       r.sub.textContent = left ? 'ще в підземеллі' : 'усіх переможено';
       r.row.classList.toggle('done', left === 0);
@@ -256,6 +256,10 @@ function enemyTraits(def) {
   if (def.armor) t.push(`броня ${def.armor}`);
   if (def.shield) t.push(`щит ${Math.round(def.shield * 100)}%${def.shieldRegen ? ' (відновлюється)' : ''}`);
   if (def.slowImmune) t.push('не мерзне');
+  if (def.haste) t.push(`пришвидшує сусідів на ${Math.round((def.haste.mul - 1) * 100)}%`);
+  if (def.lastStand) t.push('переживає смертельний удар');
+  if (def.magicImmune) t.push('не відчуває магії');
+  if (def.spawn) t.push(`гинучи, лишає: ${ENEMIES[def.spawn].name.toLowerCase()}`);
   if (def.heal) t.push('лікує');
   if (def.stealth) t.push('невидимий');
   if (def.lifeDmg) t.push(`Серцю −${def.lifeDmg}`);
