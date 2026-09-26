@@ -58,12 +58,12 @@ body {
 
 main {
   display: grid;
-  grid-template-columns: 240px minmax(0, 800px) 270px 220px;
+  grid-template-columns: 240px minmax(0, 800px) 340px 220px;
   gap: 16px;
   align-items: start;
   justify-content: center;
 }
-@media (max-width: 1400px) {
+@media (max-width: 1680px) {
   #app { padding-right: 16px; }
   #hud { padding-right: 0; }
   /* поле зверху на всю ширину, бічні колонки — під ним */
@@ -94,7 +94,7 @@ main {
   cursor: crosshair;
 }
 
-#overlay {
+#overlay, #confirm {
   position: absolute;
   inset: 0;
   display: flex;
@@ -104,7 +104,7 @@ main {
   border-radius: 5px;
   line-height: normal;
 }
-#overlay .panel {
+#overlay .panel, #confirm .panel {
   background: linear-gradient(var(--stone-hi), var(--stone));
   border: 1px solid var(--stone-edge);
   box-shadow: 0 10px 40px rgba(0,0,0,0.8);
@@ -112,10 +112,13 @@ main {
   border-radius: 10px;
   text-align: center;
 }
-#overlay h2 { font-family: Cinzel, Georgia, serif; margin: 0 0 8px; font-size: 28px; }
-#overlay p { max-width: 380px; margin: 0 auto 14px; color: var(--muted); }
+#overlay h2, #confirm h2 { font-family: Cinzel, Georgia, serif; margin: 0 0 8px; font-size: 28px; }
+#overlay p, #confirm p { max-width: 380px; margin: 0 auto 14px; color: var(--muted); }
 .overlay-btns { display: flex; flex-direction: column; gap: 8px; min-width: 260px; }
 .overlay-btns button { margin: 0; }
+#confirm h2 { font-size: 22px; }
+.confirm-btns { display: flex; gap: 8px; }
+.confirm-btns button { margin: 0; min-width: 120px; }
 #hud button.hud-btn.on { border-color: var(--soul); color: #ffe7a0; box-shadow: 0 0 8px rgba(201, 162, 39, 0.4); }
 
 #left { display: flex; flex-direction: column; gap: 12px; min-width: 0; }

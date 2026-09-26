@@ -143,9 +143,29 @@ $('upgradeBtn').addEventListener('click', () => { if (ui.selected) upgradeTower(
 document.querySelectorAll('#dirPad button').forEach(b => b.addEventListener('click', () => {
   if (ui.selected && ui.selected.def.fixedDir) ui.selected.setDir(+b.dataset.dir);
 }));
-$('sellBtn').addEventListener('click', () => {
-  if (ui.selected) { sellTower(ui.selected); ui.selected = null; }
-});
+$('sellBtn').addEventListener('click', () => { if (ui.selected) askSell(ui.selected); });
+
+// Питання перед вигнанням: гра на паузі, поки гравець не відповість (Enter — так, Esc — ні).
+let confirmState = null;  // { tower, wasPaused }
+function askSell(tower) {
+  confirmState = { tower, wasPaused: game.paused };
+  game.paused = true;
+  $('confirmText').textContent = `${tower.def.name} (рівень ${tower.level}) піде з підземелля, `
+    + `а ти повернеш 👻 ${tower.sellValue}.`;
+  $('confirm').classList.remove('hidden');
+}
+function closeConfirm(yes) {
+  const { tower, wasPaused } = confirmState;
+  confirmState = null;
+  $('confirm').classList.add('hidden');
+  game.paused = wasPaused;
+  if (yes && game.towers.includes(tower)) {
+    sellTower(tower);
+    if (ui.selected === tower) ui.selected = null;
+  }
+}
+$('confirmYes').addEventListener('click', () => closeConfirm(true));
+$('confirmNo').addEventListener('click', () => closeConfirm(false));
 $('restartBtn').addEventListener('click', () => { newGame(game.mode); cancelSelection(); });
 $('campaignBtn').addEventListener('click', () => { newGame('campaign'); cancelSelection(); });
 $('endlessBtn').addEventListener('click', () => { newGame('endless'); cancelSelection(); });
@@ -196,6 +216,11 @@ document.addEventListener('keydown', startMusicOnce);
 // ---------- клавіатура ----------
 const towerTypes = Object.keys(TOWERS);
 document.addEventListener('keydown', e => {
+  if (confirmState) {   // поки висить питання, інші гарячі клавіші не працюють
+    if (e.key === 'Enter' || e.key === 'Escape') { e.preventDefault(); closeConfirm(e.key === 'Enter'); }
+    else if (e.key === ' ') e.preventDefault();
+    return;
+  }
   const ti = e.key.length === 1 ? TOWER_KEYS.indexOf(e.key) : -1;
   if (ti >= 0 && ti < towerTypes.length) selectTowerType(towerTypes[ti]);
   else if (e.key === 'Escape') cancelSelection();
