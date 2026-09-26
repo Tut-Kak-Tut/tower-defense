@@ -29,11 +29,12 @@ const MAX_TOWERS = 18;        // скільки монстрів може жит
 
 // range і splash — у клітинках, rate — секунд між атаками.
 // attack: 'projectile' (за замовчуванням) | 'aura' (б'є всіх у радіусі) | 'beam' (промінь крізь усіх на лінії)
+//         | 'haunt' (постійна аура без урону: усі в радіусі крихкі на frail, невидимі розкриті й сповільнені на slow)
 //         | 'web' (павук раз на rate с стріляє павутиною в конус перед собою: кут cone (градусів, повний),
 //           дальність range; усі в конусі стоять на місці hold с (бос — вдвічі менше), без урону.
 //           З рівнем ростуть утримання (holdLvl), дальність (webRangeLvl) і частота (LVL_RATE)).
 // Необов'язкові механіки: splash, slow/slowTime, poison (урон/с крізь броню)/poisonTime,
-// chain (скільки разів перестрибує)/chainRange, stun (с)/stunChance, detect (бачить невидимих),
+// chainRange (блискавка стрибає по targets цілях), stun (с)/stunChance, detect (бачить невидимих),
 // slowLvl (сповільнення міцнішає з рівнем), frail/frailLvl (ціль отримує +frail урону від усіх, поки сповільнена),
 // dmgLvl (свій множник урону за рівень замість LVL_DMG — для монстрів, що б'ють по натовпу), rangeLvl/rateLvl (свої кроки
 // дальності й частоти замість LVL_RANGE/LVL_RATE), targets/targetLvls (скільки цілей і на яких рівнях +1),
@@ -41,8 +42,8 @@ const MAX_TOWERS = 18;        // скільки монстрів може жит
 const TOWERS = {
   archer: {
     name: 'Скелет-лучник', color: '#e8dcc0', cost: 50,
-    damage: 9, range: 4.5, rate: 0.9, projSpeed: 550,
-    desc: 'Далекобійний: влучає в одного авантюриста здалеку, але б’є слабко',
+    damage: 10, range: 3, rate: 0.9, projSpeed: 550, dmgLvl: 1, rangeLvl: 1.5 / 9, rateLvl: 0.92,
+    desc: 'Влучає в одного авантюриста; з рівнем стріляє частіше й далі (до 4.5 кл.), урон незмінний',
   },
   cannon: {
     name: 'Вогняний імп', color: '#ff7a2f', cost: 100,
@@ -50,10 +51,9 @@ const TOWERS = {
     desc: 'Повільний фаєрбол, вибух по площі',
   },
   frost: {
-    name: 'Привид', color: '#8fe3ff', cost: 75,
-    damage: 4, range: 2.5, rate: 0.9, projSpeed: 400, slow: 0.5, slowTime: 2, slowLvl: 0.015, detect: true,
-    frail: 0.2, frailLvl: 0.015,
-    desc: 'Крижаний дотик: сповільнює, робить крихким (усі монстри б’ють його сильніше), підсвічує невидимих',
+    name: 'Привид', color: '#8fe3ff', cost: 75, attack: 'haunt',
+    damage: 0, range: 2.5, slow: 0.5, slowLvl: 0.015, detect: true, frail: 0.1, frailLvl: 0.1 / 9,
+    desc: 'Не б’є, а холодить: усі в його тумані отримують більше урону; невидимих розкриває і сповільнює',
   },
   spider: {
     name: 'Печерний павук', color: '#8fd14f', cost: 80,
@@ -67,8 +67,8 @@ const TOWERS = {
   },
   lich: {
     name: 'Лич', color: '#b98cff', cost: 150,
-    damage: 22, range: 3, rate: 1.3, projSpeed: 700, chain: 3, chainRange: 1.8, magic: true,
-    desc: 'Блискавка перестрибує між авантюристами (−25% за стрибок)',
+    damage: 28, range: 3, rate: 1.3, projSpeed: 700, chainRange: 1.8, targets: 2, targetLvls: [5, 10], magic: true,
+    desc: 'Блискавка перестрибує по 2 авантюристах (3 — з 5-го рівня, 4 — з 10-го), −25% за стрибок',
   },
   eye: {
     name: 'Біхолдер', color: '#ff4d6d', cost: 175, attack: 'beam', fixedDir: true, beamWidth: 1,

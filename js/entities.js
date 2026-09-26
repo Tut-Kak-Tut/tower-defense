@@ -26,7 +26,7 @@ function towerStats(def, level) {
     slow: def.slow ? Math.max(0.3, def.slow - (def.slowLvl || 0) * l) : 0,
     frail: def.frail ? def.frail + def.frailLvl * l : 0,
     stunChance: def.stunChance ? Math.min(0.8, def.stunChance + 0.04 * l) : 0,
-    chain: def.chain ? def.chain + Math.floor(l / 3) : 0,
+    chain: def.chainRange ? targetsAt(def, level) - 1 : 0,
   };
 }
 
@@ -388,6 +388,7 @@ class Tower {
         if (e.stealth && this.reaches(e)) e.revealed = 0.3;
       }
     }
+    if (this.def.attack === 'haunt') { this.haunt(game, this.stats()); return; }
     this.cooldown -= dt;
     if (this.cooldown > 0) return;
     let target = null;
@@ -405,6 +406,16 @@ class Tower {
     else if (attack === 'web') this.web(game, s);
     else game.projectiles.push(new Projectile(this, target));
     this.cooldown = s.rate;
+  }
+
+  // привид: постійний холодний туман — усі в ньому крихкі, невидимі ще й сповільнені
+  haunt(game, s) {
+    const rad = s.range * CELL;
+    for (const e of game.enemies) {
+      if (!alive(e) || Math.hypot(e.x - this.x, e.y - this.y) > rad + e.radius) continue;
+      e.makeFrail(s.frail, 0.2);
+      if (e.stealth) e.slow(s.slow, 0.3);
+    }
   }
 
   // голем: удар по землі по всіх у радіусі (і невидимих теж — земля трясеться під усіма)
@@ -457,6 +468,18 @@ class Tower {
     ctx.strokeStyle = 'rgba(150, 95, 220, 0.55)';
     ctx.lineWidth = 1.5;
     ctx.stroke();
+
+    if (this.def.attack === 'haunt') {
+      // холодний туман привида на всю зону дії, ледь дихає
+      const rad = this.range;
+      const fog = ctx.createRadialGradient(x, y, rad * 0.2, x, y, rad);
+      fog.addColorStop(0, 'rgba(143, 227, 255, 0)');
+      fog.addColorStop(1, `rgba(143, 227, 255, ${0.1 + Math.sin(time * 2 + x) * 0.03})`);
+      ctx.fillStyle = fog;
+      ctx.beginPath();
+      ctx.arc(x, y, rad, 0, Math.PI * 2);
+      ctx.fill();
+    }
 
     ctx.save();
     ctx.translate(x, y);

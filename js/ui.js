@@ -298,35 +298,47 @@ function refreshUpgrade() {
     const maxed = t.level >= MAX_LEVEL;
     $('upName').textContent = def.name;
     $('upLevel').textContent = '◆'.repeat(t.level) + '◇'.repeat(MAX_LEVEL - t.level) + ` рівень ${t.level}/${MAX_LEVEL}`;
-    const web = def.attack === 'web';
-    $('upDesc').textContent = maxed
-      ? `${def.desc}. Монстр досяг найвищого рівня.`
-      : web ? `${def.desc}. Посилення: павутина тримає довше, летить далі, постріли частіші.`
-      : `${def.desc}. Посилення: урон +${Math.round(((def.dmgLvl || LVL_DMG) - 1) * 100)}%, ` +
-        `дальність +${LVL_RANGE} кл., атака на ${Math.round((1 - LVL_RATE) * 100)}% частіше.`;
-
     const now = towerStats(def, t.level);
     const next = maxed ? null : towerStats(def, t.level + 1);
-    const rows = web ? [
-      ['Утримання', now.hold.toFixed(1) + 'с', next && next.hold.toFixed(1) + 'с'],
-      ['Дальність', now.range.toFixed(2) + ' кл.', next && next.range.toFixed(2) + ' кл.'],
-      ['Перезарядка', now.rate.toFixed(2) + 'с', next && next.rate.toFixed(2) + 'с'],
-      ['Конус', def.cone + '°', def.cone + '°'],
-    ] : [
-      ['Урон', Math.round(now.damage), next && Math.round(next.damage)],
-      ['Дальність', now.range.toFixed(2), next && next.range.toFixed(2)],
-      ['Атака', now.rate.toFixed(2) + 'с', next && next.rate.toFixed(2) + 'с'],
-    ];
+    const attack = def.attack || 'projectile';
+    // що росте з рівнем — одним реченням
+    const grows = {
+      web: 'павутина тримає довше, летить далі, постріли частіші',
+      haunt: 'туман ширший, крихкість сильніша, невидимі мерзнуть дужче',
+    }[attack] || [
+      def.dmgLvl !== 1 && `урон +${Math.round(((def.dmgLvl || LVL_DMG) - 1) * 100)}%`,
+      `дальність +${+(def.rangeLvl ?? LVL_RANGE).toFixed(2)} кл.`,
+      `атака на ${Math.round((1 - (def.rateLvl || LVL_RATE)) * 100)}% частіше`,
+    ].filter(Boolean).join(', ');
+    $('upDesc').textContent = maxed ? `${def.desc}. Монстр досяг найвищого рівня.` : `${def.desc}. Посилення: ${grows}.`;
+
+    const rows = [];
     // незмінні з рівнем — однакові в обох колонках
     const fixed = (label, v) => rows.push([label, v, v]);
     const stat = (label, f) => rows.push([label, f(now), next && f(next)]);
-    if (def.splash) fixed('Вибух', def.splash + ' кл.');
-    if (def.slow && !web) stat('Сповільнення', s => `${Math.round((1 - s.slow) * 100)}% · ${def.slowTime}с`);
-    if (def.frail) stat('Крихкість', s => `+${Math.round(s.frail * 100)}% урону`);
-    if (def.poison && !web) stat('Отрута', s => `${Math.round(s.poison)}/с · ${def.poisonTime}с`);
-    if (def.chain) stat('Стрибків', s => s.chain);
-    if (def.stun) stat('Оглушення', s => `${Math.round(s.stunChance * 100)}% · ${def.stun}с`);
-    if (def.attack === 'beam') fixed('Промінь', def.fixedDir ? 'смуга' : 'крізь усіх');
+    const range = s => s.range.toFixed(2) + ' кл.';
+    if (attack === 'web') {
+      stat('Утримання', s => s.hold.toFixed(1) + 'с');
+      stat('Дальність', range);
+      stat('Перезарядка', s => s.rate.toFixed(2) + 'с');
+      fixed('Конус', def.cone + '°');
+    } else if (attack === 'haunt') {
+      stat('Крихкість', s => `+${Math.round(s.frail * 100)}% урону`);
+      stat('Туман', range);
+      stat('Сповільнення невидимих', s => `${Math.round((1 - s.slow) * 100)}%`);
+    } else {
+      stat('Урон', s => Math.round(s.damage));
+      stat('Дальність', range);
+      stat('Атака', s => s.rate.toFixed(2) + 'с');
+      if (def.splash) fixed('Вибух', def.splash + ' кл.');
+      if (def.slow) stat('Сповільнення', s => `${Math.round((1 - s.slow) * 100)}% · ${def.slowTime}с`);
+      if (def.frail) stat('Крихкість', s => `+${Math.round(s.frail * 100)}% урону`);
+      if (def.poison) stat('Отрута', s => `${Math.round(s.poison)}/с · ${def.poisonTime}с`);
+      if (def.chainRange) stat('Цілей', s => s.chain + 1);
+      if (def.stun) stat('Оглушення', s => `${Math.round(s.stunChance * 100)}% · ${def.stun}с`);
+      if (attack === 'beam') fixed('Промінь', def.fixedDir ? 'смуга' : 'крізь усіх');
+    }
+    if (def.magic) fixed('Магія', 'маг не відчуває');
     if (def.detect) fixed('Підсвічує невидимих', 'так');
 
     $('upStats').innerHTML = rows.map(([label, a, b]) => {
