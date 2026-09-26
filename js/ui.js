@@ -287,7 +287,7 @@ function refreshRaid() {
 function enemyTraits(def) {
   const t = [];
   if (def.armor) t.push(`броня ${def.armor}`);
-  if (def.shield) t.push(`щит ${Math.round(def.shield * 100)}%${def.shieldRegen ? ' (відновлюється)' : ''}`);
+  if (def.shield) t.push(`щит ${Math.round(def.shield * 100)}%${def.shieldRegen ? ' (відновлюється)' : ''}${def.shieldWave ? ` з ${def.shieldWave}-го набігу` : ''}`);
   if (def.slowImmune) t.push('не мерзне');
   if (def.haste) t.push(`пришвидшує сусідів на ${Math.round((def.haste.mul - 1) * 100)}%`);
   if (def.lastStand) t.push('переживає смертельний удар');

@@ -42,12 +42,12 @@ new WaveBuilder(2)
   .build();
 
 new WaveBuilder(3)
-  .squad().add('fast', 4, 1)
+  .squad().add('fast', 3, 1)
   .build();
 
 new WaveBuilder(4)
   .squad().add('normal', 3, 0.8)
-  .squad().add('fast', 4, 0.45)
+  .squad().add('fast', 3, 0.45)
   .build();
 
 new WaveBuilder(5)

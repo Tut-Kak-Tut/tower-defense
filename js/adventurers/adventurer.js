@@ -63,8 +63,9 @@ class AdventurerBuilder {
 
   // --- захист ---
   setArmor(n) { return this.set('armor', n); }                      // віднімається від удару (лишається щонайменше 20%)
-  setShield(part, regen) {                                          // щит — частка maxHp, що поглинає урон першою;
-    this.set('shield', part);                                       // regen — частка щита за с, поки SHIELD_REGEN_DELAY с не били
+  setShield(part, regen, fromWave) {                                // щит — частка maxHp, що поглинає урон першою;
+    this.set('shield', part);                                       // regen — частка щита за с, поки SHIELD_REGEN_DELAY с не били;
+    if (fromWave) this.set('shieldWave', fromWave);                 // fromWave — з якого набігу щит є (раніше — без щита)
     return regen === undefined ? this : this.set('shieldRegen', regen);
   }
   setBig(on = true) { return this.set('big', on); }                 // удар лат по площі зачіпає лише на частку splashBig

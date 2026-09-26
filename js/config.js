@@ -14,7 +14,7 @@ const PATH_POINTS = [
 // Факели на стінах — лише декор [col, row]; клітинки лишаються доступними для монстрів.
 const TORCHES = [[2, 1], [5, 5], [7, 9], [11, 2], [15, 6], [17, 10]];
 
-const START_MONEY = 100;      // душі
+const START_MONEY = 150;      // душі
 const START_LIVES = 20;       // міцність Серця
 const WAVE_BONUS = 10;        // бонус за пройдену хвилю
 const WAVE_BONUS_PER = 3;     // +стільки за кожен номер хвилі

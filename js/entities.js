@@ -64,7 +64,7 @@ class Enemy {
     this.maxHp = Math.round(s.hp);
     this.hp = this.maxHp;
     this.armor = s.armor;
-    this.maxShield = Math.round(this.maxHp * (def.shield || 0));
+    this.maxShield = wave >= (def.shieldWave || 0) ? Math.round(this.maxHp * (def.shield || 0)) : 0;
     this.shield = this.maxShield;
     this.sinceHit = 0;    // секунди від останнього удару — для відновлення щита
     this.lifeDmg = def.lifeDmg || 1;
