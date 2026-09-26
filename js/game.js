@@ -23,13 +23,15 @@ let game;
 // Відладка: index.html?wave=40&money=5000 — почати одразу з 40-го набігу з 5000 душ.
 const DEBUG = new URLSearchParams(location.search);
 
-// mode: 'campaign' | 'endless'; без режиму — стартове меню (гра стоїть, поки over === 'menu').
-function newGame(mode = null) {
+// mode: 'campaign' | 'endless' | 'level' (рівень LEVEL — відрізок набігів кампанії, див. js/levels/).
+function newGame(mode) {
+  const first = mode === 'level' ? LEVEL.from : 1;   // перший набіг гри
   game = {
-    mode: mode || 'campaign',
-    money: +DEBUG.get('money') || START_MONEY,
-    lives: START_LIVES,
-    wave: Math.max(0, (+DEBUG.get('wave') || 1) - 1), // номер останньої запущеної хвилі
+    mode,
+    first,
+    money: +DEBUG.get('money') || (mode === 'level' ? LEVEL.money : START_MONEY),
+    lives: mode === 'level' ? LEVEL.lives : START_LIVES,
+    wave: Math.max(0, (+DEBUG.get('wave') || first) - 1), // номер останньої запущеної хвилі
     waveActive: false,
     spawnQueue: [],
     spawnTimer: 0,
@@ -43,7 +45,7 @@ function newGame(mode = null) {
     auto: false,        // авто-набіг: наступний стартує сам через AUTO_DELAY після зачистки
     autoTimer: 0,
     heartFlash: 0,      // секунди червоного спалаху Серця після удару
-    over: mode ? null : 'menu', // 'menu' | 'win' | 'lose'
+    over: null,         // 'win' | 'lose'
     seen: new Set(),    // типи авантюристів, що вже з'являлись — для бестіарію
     stats: {},          // тип монстра → {round, total, kills}; запис з'являється, щойно такого поселили
   };
@@ -51,13 +53,11 @@ function newGame(mode = null) {
 
 const AUTO_DELAY = 3;
 
-const maxWaves = () => game.mode === 'endless' ? Infinity : CAMPAIGN_WAVES;
+const maxWaves = () => game.mode === 'endless' ? Infinity : game.mode === 'level' ? LEVEL.to : CAMPAIGN_WAVES;
+// Номер набігу для показу: у рівні рахуємо від його першого набігу (31-й кампанії → 1-й рівня).
+const waveNo = n => n - game.first + 1;
 
-// Рекорд безкінечного режиму — у браузері; якщо сховище недоступне, просто не зберігаємо.
-const BEST_KEY = 'dungeon-heart-endless-best';
-function loadBest() {
-  try { return +localStorage.getItem(BEST_KEY) || 0; } catch { return 0; }
-}
+// Рекорд безкінечного режиму (BEST_KEY, loadBest — у config.js); якщо сховище недоступне, просто не зберігаємо.
 function saveBest(wave) {
   try { if (wave > loadBest()) localStorage.setItem(BEST_KEY, wave); } catch { /* ігноруємо */ }
 }
@@ -249,7 +249,10 @@ function update(dt) {
       if (t.def.attack === 'manual') t.boulders = Math.min(targetsAt(t.def, t.level), t.boulders + 1);
     }
     if (game.mode === 'endless') saveBest(game.wave);
-    if (game.wave >= maxWaves()) game.over = 'win';
+    if (game.wave >= maxWaves()) {
+      game.over = 'win';
+      if (game.mode === 'level') markLevelDone(LEVEL.id);
+    }
   }
 }
 

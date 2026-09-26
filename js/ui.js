@@ -9,35 +9,6 @@ const ui = {
 
 const $ = id => document.getElementById(id);
 
-// ---------- іконки (малюються один раз тими ж функціями, що й на полі) ----------
-function makeIcon(size, paint) {
-  const c = document.createElement('canvas');
-  c.width = c.height = size;
-  const g = c.getContext('2d');
-  g.translate(size / 2, size / 2);
-  paint(g);
-  return c;
-}
-
-function towerIcon(type, size = 32) {
-  return makeIcon(size, g => {
-    g.scale(size / 40, size / 40);
-    g.translate(0, -2);
-    TOWER_DRAW[type](g, -Math.PI / 2);
-  });
-}
-
-function enemyIcon(type, size = 32) {
-  const def = ENEMIES[type];
-  return makeIcon(size, g => {
-    // усі авантюристи однакового розміру в іконці; вершник із конем і списом довший за радіус
-    const k = size * 0.36 / def.radius / (type === 'knight' ? 1.5 : 1);
-    g.scale(k, k);
-    g.rotate(-Math.PI / 2);
-    drawAdventurer(g, type, def.radius, def.color);
-  });
-}
-
 // Рядок ворога для панелі набігу й бестіарію.
 function foeRow(type) {
   const row = document.createElement('div');
@@ -58,8 +29,10 @@ function foeRow(type) {
 
 // ---------- кнопки веж ----------
 const TOWER_KEYS = '1234567890-=[';   // клавіші вибору монстра за порядком у TOWERS
+const towerTypes = LEVEL ? LEVEL.monsters : Object.keys(TOWERS);   // у рівні — лише його монстри
 const towerButtons = {};
-Object.entries(TOWERS).forEach(([type, def], i) => {
+towerTypes.forEach((type, i) => {
+  const def = TOWERS[type];
   const btn = document.createElement('button');
   btn.className = 'tower-btn';
   btn.appendChild(towerIcon(type));
@@ -163,8 +136,8 @@ let confirmState = null;  // { tower, wasPaused }
 function askSell(tower) {
   confirmState = { tower, wasPaused: game.paused };
   game.paused = true;
-  $('confirmText').textContent = `${tower.def.name} (рівень ${tower.level}) піде з підземелля, `
-    + `а ти повернеш 👻 ${tower.sellValue}.`;
+  $('confirmText').textContent = L(`${tower.def.name} (рівень ${tower.level}) піде з підземелля, а ти повернеш 👻 ${tower.sellValue}.`,
+    `${tower.def.name} (уровень ${tower.level}) уйдёт из подземелья, а ты вернёшь 👻 ${tower.sellValue}.`);
   $('confirm').classList.remove('hidden');
 }
 function closeConfirm(yes) {
@@ -180,10 +153,12 @@ function closeConfirm(yes) {
 $('confirmYes').addEventListener('click', () => closeConfirm(true));
 $('confirmNo').addEventListener('click', () => closeConfirm(false));
 $('restartBtn').addEventListener('click', () => { newGame(game.mode); cancelSelection(); });
-$('campaignBtn').addEventListener('click', () => { newGame('campaign'); cancelSelection(); });
-$('endlessBtn').addEventListener('click', () => { newGame('endless'); cancelSelection(); });
 $('continueBtn').addEventListener('click', continueEndless);
-$('menuBtn').addEventListener('click', () => { newGame(); cancelSelection(); });
+const goHome = () => { location.href = 'index.html'; };
+$('menuBtn').addEventListener('click', goHome);
+$('homeBtn').addEventListener('click', () => {
+  if (game.over || game.wave < game.first || confirm(L('Покинути підземелля? Поточна гра не збережеться.', 'Покинуть подземелье? Текущая игра не сохранится.'))) goHome();
+});
 
 function toggleAuto() {
   game.auto = !game.auto;
@@ -227,7 +202,6 @@ document.addEventListener('pointerdown', startMusicOnce);
 document.addEventListener('keydown', startMusicOnce);
 
 // ---------- клавіатура ----------
-const towerTypes = Object.keys(TOWERS);
 document.addEventListener('keydown', e => {
   if (confirmState) {   // поки висить питання, інші гарячі клавіші не працюють
     if (e.key === 'Enter' || e.key === 'Escape') { e.preventDefault(); closeConfirm(e.key === 'Enter'); }
@@ -266,10 +240,11 @@ function refreshRaid() {
     const list = $('raidList');
     list.textContent = '';
     if (index >= maxWaves()) {
-      $('raidTitle').textContent = 'Набігів більше немає';
-      list.innerHTML = '<p class="empty">Підземелля чекає в тиші.</p>';
+      $('raidTitle').textContent = L('Набігів більше немає', 'Набегов больше нет');
+      list.innerHTML = `<p class="empty">${L('Підземелля чекає в тиші.', 'Подземелье ждёт в тишине.')}</p>`;
     } else {
-      $('raidTitle').textContent = game.waveActive ? `Набіг ${index + 1} триває` : `Наступний набіг: ${index + 1}`;
+      $('raidTitle').textContent = game.waveActive ? L(`Набіг ${waveNo(index + 1)} триває`, `Набег ${waveNo(index + 1)} идёт`)
+        : L(`Наступний набіг: ${waveNo(index + 1)}`, `Следующий набег: ${waveNo(index + 1)}`);
       for (const [type, count] of Object.entries(raidGroups(index))) {
         const r = foeRow(type);
         r.total = count;
@@ -281,17 +256,17 @@ function refreshRaid() {
 
   for (const [type, r] of Object.entries(raidRows)) {
     const known = game.seen.has(type);
-    r.name.textContent = known ? ENEMIES[type].name : 'Невідомий';
+    r.name.textContent = known ? ENEMIES[type].name : L('Невідомий', 'Неизвестный');
     r.row.classList.toggle('locked', !known);
     if (game.waveActive) {
       const left = game.spawnQueue.filter(s => s.type === type).length +
         game.enemies.filter(e => e.origin === type).length;   // разом із тими, хто з них з'явився
       r.count.textContent = `${left} / ${r.total}`;
-      r.sub.textContent = left ? 'ще в підземеллі' : 'усіх переможено';
+      r.sub.textContent = left ? L('ще в підземеллі', 'ещё в подземелье') : L('усіх переможено', 'все повержены');
       r.row.classList.toggle('done', left === 0);
     } else {
       r.count.textContent = `×${r.total}`;
-      r.sub.textContent = known ? ENEMIES[type].desc : 'ще не зустрічався';
+      r.sub.textContent = known ? ENEMIES[type].desc : L('ще не зустрічався', 'ещё не встречался');
     }
   }
 }
@@ -300,22 +275,22 @@ function refreshRaid() {
 // Особливості авантюриста одним рядком: «броня 6 · щит 50% · …».
 function enemyTraits(def) {
   const t = [];
-  if (def.armor) t.push(`броня ${def.armor}`);
-  if (def.shield) t.push(`щит ${Math.round(def.shield * 100)}%${def.shieldRegen ? ' (відновлюється)' : ''}${def.shieldWave ? ` з ${def.shieldWave}-го набігу` : ''}`);
-  if (def.slowImmune) t.push('не мерзне');
-  if (def.physArmor) t.push('броня лише від фізичних ударів');
-  if (def.shieldAura) t.push('щит накриває сусідів');
-  if (def.haste) t.push(`пришвидшує сусідів на ${Math.round((def.haste.mul - 1) * 100)}%`);
-  if (def.undying) t.push('не гине, поки є союзники');
-  if (def.magicWard) t.push(`магічний щит −${Math.round(def.magicWard.cut * 100)}% магії поруч`);
-  if (def.escort) t.push(`ходить лише з: ${ENEMIES[def.escort].name.toLowerCase()}`);
-  if (def.spawn) t.push(`гинучи, лишає: ${ENEMIES[def.spawn].name.toLowerCase()}`);
-  if (def.split) t.push(`ділиться ${def.split} рази`);
-  if (def.deflect) t.push(`відбиває ${Math.round(def.deflect * 100)}% снарядів`);
-  if (def.big) t.push('великий');
-  if (def.heal) t.push('лікує');
-  if (def.stealth) t.push('невидимий');
-  if (def.lifeDmg) t.push(`Серцю −${def.lifeDmg}`);
+  if (def.armor) t.push(L(`броня ${def.armor}`, `броня ${def.armor}`));
+  if (def.shield) t.push(`щит ${Math.round(def.shield * 100)}%${def.shieldRegen ? L(' (відновлюється)', ' (восстанавливается)') : ''}${def.shieldWave ? L(` з ${def.shieldWave}-го набігу`, ` с ${def.shieldWave}-го набега`) : ''}`);
+  if (def.slowImmune) t.push(L('не мерзне', 'не мёрзнет'));
+  if (def.physArmor) t.push(L('броня лише від фізичних ударів', 'броня только от физических ударов'));
+  if (def.shieldAura) t.push(L('щит накриває сусідів', 'щит накрывает соседей'));
+  if (def.haste) t.push(L('пришвидшує сусідів на ', 'ускоряет соседей на ') + Math.round((def.haste.mul - 1) * 100) + '%');
+  if (def.undying) t.push(L('не гине, поки є союзники', 'не гибнет, пока есть союзники'));
+  if (def.magicWard) t.push(L(`магічний щит −${Math.round(def.magicWard.cut * 100)}% магії поруч`, `магический щит −${Math.round(def.magicWard.cut * 100)}% магии рядом`));
+  if (def.escort) t.push(L('ходить лише з: ', 'ходит только с: ') + ENEMIES[def.escort].name.toLowerCase());
+  if (def.spawn) t.push(L('гинучи, лишає: ', 'погибая, оставляет: ') + ENEMIES[def.spawn].name.toLowerCase());
+  if (def.split) t.push(L(`ділиться ${def.split} рази`, `делится ${def.split} раза`));
+  if (def.deflect) t.push(L(`відбиває ${Math.round(def.deflect * 100)}% снарядів`, `отражает ${Math.round(def.deflect * 100)}% снарядов`));
+  if (def.big) t.push(L('великий', 'большой'));
+  if (def.heal) t.push(L('лікує', 'лечит'));
+  if (def.stealth) t.push(L('невидимий', 'невидимый'));
+  if (def.lifeDmg) t.push(L('Серцю −', 'Сердцу −') + def.lifeDmg);
   return t.length ? '. ' + t.join(' · ') : '';
 }
 
@@ -329,8 +304,8 @@ function refreshBestiary() {
     const reward = def.split ? def.splitReward * 2 ** def.split : def.reward;
     r.count.textContent = known ? `👻 ${reward}` : '';
     r.sub.textContent = known
-      ? `${def.desc}. Здоров'я ${def.hp}, швидкість ${def.speed}${enemyTraits(def)}`
-      : 'Ще не зустрічався в підземеллі';
+      ? `${def.desc}. ${L("Здоров'я", 'Здоровье')} ${def.hp}, ${L('швидкість', 'скорость')} ${def.speed}${enemyTraits(def)}`
+      : L('Ще не зустрічався в підземеллі', 'Ещё не встречался в подземелье');
   }
 }
 
@@ -344,23 +319,23 @@ function levelGains(attack, now, next) {
   const pct = (a, b) => signed((b / a - 1) * 100, 0) + '%';
   const out = [];
   const add = (key, text) => { if (next[key] !== now[key]) out.push(text(now[key], next[key])); };
-  add('damage', (a, b) => (attack === 'drain' ? 'висмоктування ' : 'урон ') + (a ? pct(a, b) : `${Math.round(a)} → ${Math.round(b)}`));
-  add('range', (a, b) => `${attack === 'haunt' ? 'туман' : 'дальність'} ${signed(b - a)} кл.`);
-  add('rate', (a, b) => attack === 'drain' ? `розгін ${b < a ? 'швидший' : 'повільніший'}`
-    : `${attack === 'web' ? 'постріли' : 'атака'} на ${Math.round(Math.abs(1 - b / a) * 100)}% ${b < a ? 'частіше' : 'рідше'}`);
-  add('targets', (a, b) => `${attack === 'manual' ? 'валунів' : 'цілей'} ${a} → ${b}`);
-  add('hold', (a, b) => `утримання ${signed(b - a, 1)}с`);
-  add('slow', (a, b) => `невидимі мерзнуть ${b < a ? 'дужче' : 'слабше'}`);
-  add('frail', (a, b) => `крихкість ${signed((b - a) * 100, 1)}%`);
-  add('stunChance', (a, b) => `шанс оглушення ${signed((b - a) * 100, 0)}%`);
-  add('splash', (a, b) => `${attack === 'cleave' ? 'удар по площі' : 'вибух'} ${signed(b - a)} кл.`);
-  add('buff', (a, b) => `зілля ${signed((b - a) * 100, 0)}%`);
-  add('souls', (a, b) => `душі ${a} → ${b}`);
-  add('knock', (a, b) => `відкидання ${signed(b - a, 1)} кл.`);
-  add('chainRange', (a, b) => `стрибок ${signed(b - a, 1)} кл.`);
-  add('minRange', (a, b) => `мертва зона ${signed(b - a)} кл.`);
-  add('poison', (a, b) => `отрута ${a ? pct(a, b) : '+' + Math.round(b)}`);
-  return out.join(', ') || 'характеристики не змінюються';
+  add('damage', (a, b) => (attack === 'drain' ? L('висмоктування ', 'высасывание ') : 'урон ') + (a ? pct(a, b) : `${Math.round(a)} → ${Math.round(b)}`));
+  add('range', (a, b) => `${attack === 'haunt' ? L('туман', 'туман') : L('дальність', 'дальность')} ${signed(b - a)} ${L('кл.', 'кл.')}`);
+  add('rate', (a, b) => attack === 'drain' ? L(`розгін ${b < a ? 'швидший' : 'повільніший'}`, `разгон ${b < a ? 'быстрее' : 'медленнее'}`)
+    : `${attack === 'web' ? L('постріли', 'выстрелы') : 'атака'} на ${Math.round(Math.abs(1 - b / a) * 100)}% ${b < a ? L('частіше', 'чаще') : L('рідше', 'реже')}`);
+  add('targets', (a, b) => `${attack === 'manual' ? L('валунів', 'валунов') : L('цілей', 'целей')} ${a} → ${b}`);
+  add('hold', (a, b) => `${L('утримання', 'удержание')} ${signed(b - a, 1)}${L('с', 'с')}`);
+  add('slow', (a, b) => L(`невидимі мерзнуть ${b < a ? 'дужче' : 'слабше'}`, `невидимые мёрзнут ${b < a ? 'сильнее' : 'слабее'}`));
+  add('frail', (a, b) => `${L('крихкість', 'хрупкость')} ${signed((b - a) * 100, 1)}%`);
+  add('stunChance', (a, b) => `${L('шанс оглушення', 'шанс оглушения')} ${signed((b - a) * 100, 0)}%`);
+  add('splash', (a, b) => `${attack === 'cleave' ? L('удар по площі', 'удар по площади') : L('вибух', 'взрыв')} ${signed(b - a)} кл.`);
+  add('buff', (a, b) => `${L('зілля', 'зелье')} ${signed((b - a) * 100, 0)}%`);
+  add('souls', (a, b) => `${L('душі', 'души')} ${a} → ${b}`);
+  add('knock', (a, b) => `${L('відкидання', 'отбрасывание')} ${signed(b - a, 1)} кл.`);
+  add('chainRange', (a, b) => `${L('стрибок', 'прыжок')} ${signed(b - a, 1)} кл.`);
+  add('minRange', (a, b) => `${L('мертва зона', 'мёртвая зона')} ${signed(b - a)} кл.`);
+  add('poison', (a, b) => `${L('отрута', 'яд')} ${a ? pct(a, b) : '+' + Math.round(b)}`);
+  return out.join(', ') || L('характеристики не змінюються', 'характеристики не меняются');
 }
 
 function refreshUpgrade() {
@@ -381,12 +356,12 @@ function refreshUpgrade() {
     const def = t.def;
     const maxed = t.level >= MAX_LEVEL;
     $('upName').textContent = def.name;
-    $('upLevel').textContent = '◆'.repeat(t.level) + '◇'.repeat(MAX_LEVEL - t.level) + ` рівень ${t.level}/${MAX_LEVEL}`;
+    $('upLevel').textContent = '◆'.repeat(t.level) + '◇'.repeat(MAX_LEVEL - t.level) + ` ${L('рівень', 'уровень')} ${t.level}/${MAX_LEVEL}`;
     const now = towerStats(def, t.level);
     const next = maxed ? null : towerStats(def, t.level + 1);
     const attack = def.attack || 'projectile';
-    $('upDesc').textContent = maxed ? `${def.desc}. Монстр досяг найвищого рівня.`
-      : `${def.desc}. Посилення: ${levelGains(attack, now, next)}.`;
+    $('upDesc').textContent = maxed ? `${def.desc}. ${L('Монстр досяг найвищого рівня.', 'Монстр достиг высшего уровня.')}`
+      : `${def.desc}. ${L('Посилення', 'Усиление')}: ${levelGains(attack, now, next)}.`;
 
     const rows = [];
     // незмінні з рівнем — однакові в обох колонках
@@ -394,49 +369,49 @@ function refreshUpgrade() {
     const stat = (label, f) => rows.push([label, f(now), next && f(next)]);
     const range = s => s.range.toFixed(2) + ' кл.';
     if (attack === 'web') {
-      stat('Утримання', s => s.hold.toFixed(1) + 'с');
-      stat('Дальність', range);
+      stat(L('Утримання', 'Удержание'), s => s.hold.toFixed(1) + 'с');
+      stat(L('Дальність', 'Дальность'), range);
       stat('Перезарядка', s => s.rate.toFixed(2) + 'с');
       fixed('Конус', def.cone + '°');
     } else if (attack === 'drain') {
       stat('Урон/с', s => `${Math.round(s.damage)}…${Math.round(s.damageMax)}`);
-      stat('Розгін', s => (def.ramp * s.rate).toFixed(1) + 'с');
-      stat('Цілей', s => s.targets);
-      stat('Дальність', range);
+      stat(L('Розгін', 'Разгон'), s => (def.ramp * s.rate).toFixed(1) + 'с');
+      stat(L('Цілей', 'Целей'), s => s.targets);
+      stat(L('Дальність', 'Дальность'), range);
     } else if (attack === 'buff') {
-      stat('Зілля', s => `+${Math.round(s.buff * 100)}%`);
-      stat('Кому', s => `${s.targets} випадк. монстр${s.targets === 1 ? 'у' : 'ам'}`);
+      stat(L('Зілля', 'Зелье'), s => `+${Math.round(s.buff * 100)}%`);
+      stat('Кому', s => `${s.targets} ${L('випадк.', 'случайн.')} монстр${s.targets === 1 ? 'у' : 'ам'}`);
     } else if (attack === 'grave') {
-      stat('Душі', s => `+${s.souls} 👻 за ${def.every} смертей`);
+      stat(L('Душі', 'Души'), s => `+${s.souls} 👻 за ${def.every} смертей`);
       fixed('Смертей', `${t.deaths} / ${def.every}`);
     } else if (attack === 'manual') {
-      stat('Валуни', s => `${Math.min(t.boulders, s.targets)} / ${s.targets}`);
-      stat('Відкидання', s => s.knock.toFixed(1) + ' кл.');
-      fixed('Вибух', `${def.damage} урону`);
-      fixed('Кидок', def.range + ' кл.');
+      stat(L('Валуни', 'Валуны'), s => `${Math.min(t.boulders, s.targets)} / ${s.targets}`);
+      stat(L('Відкидання', 'Отбрасывание'), s => s.knock.toFixed(1) + ' кл.');
+      fixed(L('Вибух', 'Взрыв'), `${def.damage} ${L('урону', 'урона')}`);
+      fixed(L('Кидок', 'Бросок'), def.range + ' кл.');
     } else if (attack === 'haunt') {
-      stat('Крихкість', s => `+${Math.round(s.frail * 100)}% урону`);
-      stat('Туман', range);
-      stat('Сповільнення невидимих', s => `${Math.round((1 - s.slow) * 100)}%`);
+      stat(L('Крихкість', 'Хрупкость'), s => `+${Math.round(s.frail * 100)}% ${L('урону', 'урона')}`);
+      stat(L('Туман', 'Туман'), range);
+      stat(L('Сповільнення невидимих', 'Замедление невидимых'), s => `${Math.round((1 - s.slow) * 100)}%`);
     } else {
       stat('Урон', s => Math.round(s.damage));
-      stat('Дальність', range);
+      stat(L('Дальність', 'Дальность'), range);
       stat('Атака', s => s.rate.toFixed(2) + 'с');
-      if (def.splash) stat(attack === 'cleave' ? 'Удар по площі' : 'Вибух', s => +s.splash.toFixed(2) + ' кл.');
-      if (def.splashBig !== undefined) fixed('Великим по площі', def.splashBig ? Math.round(def.splashBig * 100) + '% урону' : 'не зачіпає');
-      if (def.minRange) stat('Мертва зона', s => `ближче ${+s.minRange.toFixed(2)} кл.`);
-      if (def.slow) stat('Сповільнення', s => `${Math.round((1 - s.slow) * 100)}% · ${def.slowTime}с`);
-      if (def.frail) stat('Крихкість', s => `+${Math.round(s.frail * 100)}% урону`);
-      if (def.poison) stat('Отрута', s => `${Math.round(s.poison)}/с · ${def.poisonTime}с`);
-      if (def.chainRange) stat('Цілей', s => s.chain + 1);
-      if (def.chainRange) stat('Стрибок', s => s.chainRange.toFixed(1) + ' кл.');
-      if (def.stun) stat('Оглушення', s => `${Math.round(s.stunChance * 100)}% · ${def.stun}с`);
-      if (attack === 'beam') fixed('Промінь', def.fixedDir ? 'смуга' : 'крізь усіх');
+      if (def.splash) stat(attack === 'cleave' ? L('Удар по площі', 'Удар по площади') : L('Вибух', 'Взрыв'), s => +s.splash.toFixed(2) + ' кл.');
+      if (def.splashBig !== undefined) fixed(L('Великим по площі', 'Большим по площади'), def.splashBig ? Math.round(def.splashBig * 100) + L('% урону', '% урона') : L('не зачіпає', 'не задевает'));
+      if (def.minRange) stat(L('Мертва зона', 'Мёртвая зона'), s => `${L('ближче', 'ближе')} ${+s.minRange.toFixed(2)} кл.`);
+      if (def.slow) stat(L('Сповільнення', 'Замедление'), s => `${Math.round((1 - s.slow) * 100)}% · ${def.slowTime}с`);
+      if (def.frail) stat(L('Крихкість', 'Хрупкость'), s => `+${Math.round(s.frail * 100)}% ${L('урону', 'урона')}`);
+      if (def.poison) stat(L('Отрута', 'Яд'), s => `${Math.round(s.poison)}/с · ${def.poisonTime}с`);
+      if (def.chainRange) stat(L('Цілей', 'Целей'), s => s.chain + 1);
+      if (def.chainRange) stat(L('Стрибок', 'Прыжок'), s => s.chainRange.toFixed(1) + ' кл.');
+      if (def.stun) stat(L('Оглушення', 'Оглушение'), s => `${Math.round(s.stunChance * 100)}% · ${def.stun}с`);
+      if (attack === 'beam') fixed(L('Промінь', 'Луч'), def.fixedDir ? L('смуга', 'полоса') : L('крізь усіх', 'сквозь всех'));
     }
-    if (def.magic) fixed('Магія', 'маг послаблює, лати не тримають');
-    if (def.armorPierce) fixed('Броня', 'ігнорує');
-    for (const b of t.buffs) fixed(b.kind === 'rate' ? 'Зілля швидкості' : 'Зілля сили', `+${Math.round(b.v * 100)}%`);
-    if (def.detect) fixed('Підсвічує невидимих', 'так');
+    if (def.magic && t.type !== 'lich') fixed(L('Магія', 'Магия'), L('маг послаблює, лати не тримають', 'маг ослабляет, латы не держат'));
+    if (def.armorPierce) fixed('Броня', L('ігнорує', 'игнорирует'));
+    for (const b of t.buffs) fixed(b.kind === 'rate' ? L('Зілля швидкості', 'Зелье скорости') : L('Зілля сили', 'Зелье силы'), `+${Math.round(b.v * 100)}%`);
+    if (def.detect) fixed(L('Підсвічує невидимих', 'Подсвечивает невидимых'), L('так', 'да'));
 
     $('upStats').innerHTML = rows.map(([label, a, b]) => {
       if (maxed) return `<tr><td>${label}</td><td class="max" colspan="3">${a}</td></tr>`;
@@ -457,13 +432,13 @@ function refreshUpgrade() {
 
   const up = $('upgradeBtn');
   if (t.upgradeCost === null) {
-    up.textContent = 'Макс. рівень';
+    up.textContent = L('Макс. рівень', 'Макс. уровень');
     up.disabled = true;
   } else {
-    up.textContent = `⬆ Посилити (👻 ${t.upgradeCost})`;
+    up.textContent = `⬆ ${L('Посилити', 'Усилить')} (👻 ${t.upgradeCost})`;
     up.disabled = game.money < t.upgradeCost;
   }
-  $('sellBtn').textContent = `Вигнати (+👻 ${t.sellValue})`;
+  $('sellBtn').textContent = `${L('Вигнати', 'Изгнать')} (+👻 ${t.sellValue})`;
 }
 
 // ---------- статистика урону за типами монстрів ----------
@@ -508,7 +483,7 @@ function refreshUI() {
   const full = game.towers.length >= MAX_TOWERS;
   $('towerCount').textContent = `${game.towers.length} / ${MAX_TOWERS}`;
   $('towersStat').classList.toggle('full', full);
-  $('wave').textContent = `${game.wave} / ${max === Infinity ? '∞' : max}`;
+  $('wave').textContent = `${waveNo(game.wave)} / ${max === Infinity ? '∞' : waveNo(max)}`;
 
   for (const [type, btn] of Object.entries(towerButtons)) {
     btn.classList.toggle('active', ui.placing === type);
@@ -528,46 +503,47 @@ function refreshUI() {
   const waveBtn = $('waveBtn');
   waveBtn.disabled = game.waveActive || !!game.over;
   waveBtn.classList.toggle('hidden', game.wave >= max && !game.waveActive);
-  waveBtn.textContent = game.waveActive ? '⚔️ Набіг триває…'
-    : game.auto ? `⚔️ Набіг ${game.wave + 1} через ${Math.ceil(game.autoTimer)}с`
-    : `⚔️ Впустити набіг ${game.wave + 1}`;
+  waveBtn.textContent = game.waveActive ? L('⚔️ Набіг триває…', '⚔️ Набег идёт…')
+    : game.auto ? `⚔️ ${L('Набіг', 'Набег')} ${waveNo(game.wave + 1)} через ${Math.ceil(game.autoTimer)}с`
+    : `⚔️ ${L('Впустити набіг', 'Впустить набег')} ${waveNo(game.wave + 1)}`;
   $('speedBtn').textContent = `⏩ x${game.speed}`;
-  $('autoBtn').textContent = game.auto ? '🔁 Авто: так' : '🔁 Авто: ні';
+  $('autoBtn').textContent = game.auto ? L('🔁 Авто: так', '🔁 Авто: да') : L('🔁 Авто: ні', '🔁 Авто: нет');
   $('autoBtn').classList.toggle('on', game.auto);
-  $('pauseBtn').textContent = game.paused ? '▶ Далі' : '⏸ Пауза';
+  $('pauseBtn').textContent = game.paused ? L('▶ Далі', '▶ Дальше') : '⏸ Пауза';
   $('musicBtn').textContent = musicOn ? '🔊' : '🔇';
   $('musicBtn').classList.toggle('on', musicOn);
 
   refreshOverlay();
 }
 
-// Вікно поверх поля: стартове меню, перемога, поразка. Кнопки лише ховаємо/показуємо.
+// Вікно поверх поля: перемога чи поразка. Кнопки лише ховаємо/показуємо.
 function refreshOverlay() {
   const over = game.over;
   $('overlay').classList.toggle('hidden', !over);
   if (!over) return;
   const best = loadBest();
-  const bestText = best ? `Рекорд безкінечного режиму: ${best} набігів.` : '';
+  const bestText = best ? L(`Рекорд безкінечного режиму: ${best} набігів.`, `Рекорд бесконечного режима: ${best} набегов.`) : '';
   let title, text;
-  if (over === 'menu') {
-    title = '💜 Серце Підземелля';
-    text = `Кампанія — ${CAMPAIGN_WAVES} набігів із босом кожні 10. У безкінечному режимі набіги не закінчуються. ${bestText}`;
+  if (over === 'win' && game.mode === 'level') {
+    title = L('👑 Рівень пройдено', '👑 Уровень пройден');
+    text = L(`«${LEVEL.name}» вистояло всі ${waveNo(LEVEL.to)} набігів. Міцність Серця: ${game.lives}.`,
+      `«${LEVEL.name}» выстояло все ${waveNo(LEVEL.to)} набегов. Прочность Сердца: ${game.lives}.`);
   } else if (over === 'win') {
-    title = '👑 Підземелля вистояло';
-    text = `Усі ${CAMPAIGN_WAVES} набігів відбито. Міцність Серця: ${game.lives}. Можна тримати оборону й далі.`;
+    title = L('👑 Підземелля вистояло', '👑 Подземелье выстояло');
+    text = L(`Усі ${CAMPAIGN_WAVES} набігів відбито. Міцність Серця: ${game.lives}. Можна тримати оборону й далі.`,
+      `Все ${CAMPAIGN_WAVES} набегов отбиты. Прочность Сердца: ${game.lives}. Можно держать оборону и дальше.`);
   } else {
-    title = '💔 Серце зруйновано';
-    text = `Авантюристи прорвались до Серця під час набігу ${game.wave}. ${game.mode === 'endless' ? bestText : ''}`;
+    title = L('💔 Серце зруйновано', '💔 Сердце разрушено');
+    text = L(`Авантюристи прорвались до Серця під час набігу ${waveNo(game.wave)}.`, `Авантюристы прорвались к Сердцу во время набега ${waveNo(game.wave)}.`)
+      + (game.mode === 'endless' ? ' ' + bestText : '');
   }
   $('overlayTitle').textContent = title;
   $('overlayText').textContent = text;
-  $('campaignBtn').classList.toggle('hidden', over !== 'menu');
-  $('endlessBtn').classList.toggle('hidden', over !== 'menu');
-  $('continueBtn').classList.toggle('hidden', over !== 'win');
-  $('restartBtn').classList.toggle('hidden', over === 'menu');
-  $('menuBtn').classList.toggle('hidden', over === 'menu');
+  $('continueBtn').classList.toggle('hidden', !(over === 'win' && game.mode === 'campaign'));
 }
 
 // ---------- старт ----------
-newGame(DEBUG.has('wave') || DEBUG.has('money') ? 'campaign' : null); // з параметрами відладки — одразу в гру
+// game.html?level=crypt — рівень; ?mode=endless — безкінечний; інакше кампанія (головна сторінка — index.html).
+newGame(LEVEL ? 'level' : DEBUG.get('mode') === 'endless' ? 'endless' : 'campaign');
+if (LEVEL) { $('title').textContent = LEVEL.name; document.title = `${LEVEL.name} — ${L('Серце Підземелля', 'Сердце Подземелья')}`; }
 requestAnimationFrame(frame);

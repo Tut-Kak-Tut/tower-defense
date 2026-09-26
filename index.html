@@ -8,120 +8,30 @@
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;800&display=swap">
   <link rel="stylesheet" href="style.css">
 </head>
-<body>
-  <div id="app">
-    <header id="hud">
-      <h1>Серце Підземелля</h1>
-      <div class="stat souls" title="Душі — платиш ними за монстрів">👻 <span id="money"></span></div>
-      <div class="stat heart" title="Міцність Серця">💜 <span id="lives"></span></div>
-      <div class="stat" id="towersStat" title="Монстрів у підземеллі / найбільше">👹 <span id="towerCount"></span></div>
-      <div class="stat raid" title="Набіг">⚔️ <span id="wave"></span></div>
-      <button id="speedBtn" class="hud-btn" title="Швидкість гри"></button>
-      <button id="autoBtn" class="hud-btn" title="Авто-набіг: наступний почнеться сам (A)"></button>
-      <button id="pauseBtn" class="hud-btn" title="Пауза (Пробіл)"></button>
-      <button id="musicBtn" class="hud-btn" title="Музика (M)"></button>
+<body data-ru-doc="Сердце Подземелья">
+  <div id="home">
+    <header class="home-head">
+      <h1 data-ru="💜 Сердце Подземелья">💜 Серце Підземелля</h1>
+      <p data-ru="Ты — повелитель подземелья. Выбери, какое подземелье защищать.">Ти — володар підземелля. Вибери, яке підземелля боронити.</p>
     </header>
 
-    <main>
-      <aside id="left">
-        <section id="raidPanel">
-          <h3 id="raidTitle"></h3>
-          <div id="raidList"></div>
-          <button id="waveBtn" class="primary"></button>
-        </section>
+    <h2 class="home-h2" data-ru="Уровни">Рівні</h2>
+    <div id="levelList"></div>
 
-        <section id="bestiary">
-          <h3>Бестіарій</h3>
-          <div id="bestiaryList"></div>
-        </section>
-      </aside>
-
-      <div id="board">
-        <canvas id="game" width="800" height="480"></canvas>
-        <div id="overlay" class="hidden">
-          <div class="panel">
-            <h2 id="overlayTitle"></h2>
-            <p id="overlayText"></p>
-            <div class="overlay-btns">
-              <button id="campaignBtn" class="primary">⚔️ Кампанія (100 набігів)</button>
-              <button id="endlessBtn" class="primary">♾️ Безкінечний</button>
-              <button id="continueBtn" class="primary">♾️ Продовжити безкінечно</button>
-              <button id="restartBtn" class="primary">Грати знову</button>
-              <button id="menuBtn">До меню</button>
-            </div>
-          </div>
-        </div>
-        <div id="confirm" class="hidden">
-          <div class="panel">
-            <h2>Вигнати монстра?</h2>
-            <p id="confirmText"></p>
-            <div class="confirm-btns">
-              <button id="confirmYes" class="primary">Вигнати</button>
-              <button id="confirmNo">Лишити</button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <aside id="right">
-        <nav class="tabs">
-          <button id="tabMonsters" class="tab">Монстри</button>
-          <button id="tabUpgrade" class="tab">Посилення</button>
-        </nav>
-
-        <div class="window">
-          <div id="paneMonsters">
-            <div id="towerList"></div>
-            <p class="help">
-              <b>Ти — володар підземелля.</b> Вибери монстра і посели його в нішу біля коридору.
-              Клік по монстру на полі — посилити або вигнати.<br>
-              <kbd>1</kbd>–<kbd>7</kbd> монстр · <kbd>Esc</kbd>/ПКМ скасувати ·
-              <kbd>Enter</kbd> набіг · <kbd>A</kbd> авто · <kbd>Пробіл</kbd> пауза ·
-              <kbd>R</kbd> повернути промінь біхолдера · <kbd>T</kbd> ціль монстра · <kbd>M</kbd> музика
-            </p>
-          </div>
-
-          <div id="paneUpgrade">
-            <p id="upEmpty" class="help">Клікни по монстру на полі, щоб побачити, як його можна посилити.</p>
-            <div id="upBody">
-              <div class="up-head">
-                <span id="upIcon"></span>
-                <div>
-                  <div id="upName"></div>
-                  <div id="upLevel"></div>
-                </div>
-              </div>
-              <p id="upDesc"></p>
-              <table id="upStats"></table>
-              <div id="dirPad">
-                <span class="dir-label">Промінь <kbd>R</kbd></span>
-                <button data-dir="3" title="Вгору">⬆</button>
-                <button data-dir="2" title="Ліворуч">⬅</button>
-                <button data-dir="1" title="Вниз">⬇</button>
-                <button data-dir="0" title="Праворуч">➡</button>
-              </div>
-              <div id="aimPad">
-                <span class="dir-label">Ціль <kbd>T</kbd></span>
-                <div id="aimBtns"></div>
-              </div>
-              <button id="upgradeBtn" class="primary"></button>
-              <button id="sellBtn" class="danger"></button>
-            </div>
-          </div>
-        </div>
-      </aside>
-
-      <aside id="statsPanel">
-        <h3>Статистика</h3>
-        <div class="st-row st-head">
-          <span></span><span title="Урон за поточний набіг">Набіг</span><span title="Урон за всю гру">Усього</span><span title="Скільки авантюристів добито">Вбито</span>
-        </div>
-        <div id="statsList"></div>
-        <p id="statsEmpty" class="help">Посели монстрів — тут з'явиться, хто скільки нашкодив.</p>
-      </aside>
-    </main>
+    <h2 class="home-h2" data-ru="Свободная игра">Вільна гра</h2>
+    <div class="free-play">
+      <a class="level-card free" href="game.html">
+        <h3 data-ru="⚔️ Кампания">⚔️ Кампанія</h3>
+        <p data-ru="Все 100 набегов с боссом каждые 10, все монстры, стандартная карта.">Усі 100 набігів із босом кожні 10, усі монстри, стандартна мапа.</p>
+      </a>
+      <a class="level-card free" href="game.html?mode=endless">
+        <h3>♾️ Безкінечний</h3>
+        <p><span data-ru="Набеги не заканчиваются.">Набіги не закінчуються.</span> <span id="bestText"></span></p>
+      </a>
+    </div>
   </div>
 
+  <script src="js/i18n.js"></script>
   <script src="js/config.js"></script>
   <script src="js/monsters/monster.js"></script>
   <script src="js/monsters/monsters.js"></script>
@@ -130,8 +40,10 @@
   <script src="js/waves/wave.js"></script>
   <script src="js/waves/campaign.js"></script>
   <script src="js/waves/endless.js"></script>
+  <script src="js/levels/level.js"></script>
+  <script src="js/levels/levels.js"></script>
   <script src="js/entities.js"></script>
-  <script src="js/game.js"></script>
-  <script src="js/ui.js"></script>
+  <script src="js/icons.js"></script>
+  <script src="js/home.js"></script>
 </body>
 </html>

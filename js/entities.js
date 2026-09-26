@@ -43,9 +43,14 @@ function shieldGuards(e) {
 
 // Сторони світу для променя біхолдера: індекс = tower.dir, кут = dir * π/2.
 const DIRS = [
-  { dx: 1, dy: 0, name: 'праворуч' }, { dx: 0, dy: 1, name: 'вниз' },
-  { dx: -1, dy: 0, name: 'ліворуч' }, { dx: 0, dy: -1, name: 'вгору' },
+  { dx: 1, dy: 0, name: L('праворуч', 'вправо') }, { dx: 0, dy: 1, name: L('вниз', 'вниз') },
+  { dx: -1, dy: 0, name: L('ліворуч', 'влево') }, { dx: 0, dy: -1, name: L('вгору', 'вверх') },
 ];
+
+// Поточний рівень — з ?level= у game.html; без нього (кампанія, безкінечний) — стандартна мапа.
+const LEVEL = LEVELS[new URLSearchParams(location.search).get('level')] || null;
+const PATH_POINTS = LEVEL ? LEVEL.path : DEFAULT_PATH;
+const TORCHES = LEVEL ? LEVEL.torches : DEFAULT_TORCHES;
 
 const PATH_PX = PATH_POINTS.map(([c, r]) => cellCenter(c, r));
 // Пройдена відстань до кожної точки шляху — щоб поставити авантюриста на будь-яке місце (відкидання, поява).
@@ -428,11 +433,11 @@ class Enemy {
 
 // Фільтри цілі: з доступних монстр бере того, в кого score найбільший.
 const TARGET_MODES = {
-  first:  { label: 'Перший',  title: 'Найдальший по коридору',          score: e => e.progress },
-  last:   { label: 'Останній', title: 'Найближчий до входу',             score: e => -e.progress },
-  strong: { label: 'Сильний', title: 'Найбільше HP (зі щитом)',          score: e => e.hp + e.shield },
-  weak:   { label: 'Слабкий', title: 'Найменше HP (зі щитом)',           score: e => -(e.hp + e.shield) },
-  close:  { label: 'Ближній', title: 'Найближчий до монстра',            score: (e, t) => -Math.hypot(e.x - t.x, e.y - t.y) },
+  first:  { label: L('Перший', 'Первый'),  title: L('Найдальший по коридору', 'Дальше всех по коридору'),          score: e => e.progress },
+  last:   { label: L('Останній', 'Последний'), title: L('Найближчий до входу', 'Ближе всех ко входу'),             score: e => -e.progress },
+  strong: { label: L('Сильний', 'Сильный'), title: L('Найбільше HP (зі щитом)', 'Больше всего HP (со щитом)'),          score: e => e.hp + e.shield },
+  weak:   { label: L('Слабкий', 'Слабый'), title: L('Найменше HP (зі щитом)', 'Меньше всего HP (со щитом)'),           score: e => -(e.hp + e.shield) },
+  close:  { label: L('Ближній', 'Ближний'), title: L('Найближчий до монстра', 'Ближайший к монстру'),            score: (e, t) => -Math.hypot(e.x - t.x, e.y - t.y) },
 };
 
 class Tower {

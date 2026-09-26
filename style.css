@@ -346,3 +346,36 @@ kbd {
 .hidden { display: none !important; }
 
 .stat.full span { color: #ef476f; }
+
+/* ---------- головна сторінка (index.html) ---------- */
+#home { max-width: 1080px; margin: 0 auto; padding: 24px 16px 40px; }
+.home-head { text-align: center; margin-bottom: 8px; }
+.home-head h1 { font-family: Cinzel, Georgia, serif; font-size: 40px; margin: 0 0 6px; }
+.home-head p { color: var(--muted); margin: 0; }
+.home-h2 { font-family: Cinzel, Georgia, serif; font-size: 20px; margin: 24px 0 10px; color: var(--soul); }
+#levelList, .free-play { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px; }
+.level-card {
+  display: flex; flex-direction: column; gap: 8px;
+  background: linear-gradient(var(--stone-hi), var(--stone));
+  border: 1px solid var(--stone-edge); border-radius: 10px; padding: 14px;
+  color: var(--text); text-decoration: none;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.5);
+  transition: border-color 0.15s, transform 0.15s, box-shadow 0.15s;
+}
+.level-card:hover { border-color: var(--crimson-hi); transform: translateY(-2px); box-shadow: 0 8px 22px rgba(139, 30, 63, 0.35); }
+.level-card.done { border-color: #5d7a4a; }
+.level-card h3 { font-family: Cinzel, Georgia, serif; font-size: 18px; margin: 0; display: flex; align-items: center; gap: 8px; }
+.level-card p { margin: 0; color: var(--muted); font-size: 14px; line-height: 1.4; }
+.lv-num {
+  display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: 50%;
+  background: var(--crimson); font-size: 14px;
+}
+.lv-done { color: #9fd89a; }
+.lv-map { width: 100%; height: auto; border-radius: 5px; border: 1px solid var(--stone-edge); image-rendering: pixelated; }
+.lv-meta { display: flex; gap: 14px; font-size: 14px; }
+.lv-icons { display: flex; flex-wrap: wrap; align-items: center; gap: 2px; }
+.lv-label { color: var(--muted); font-size: 12px; width: 64px; }
+.level-card.free { justify-content: center; min-height: 110px; }
+
+/* перемикач мови на головній (у грі він — остання кнопка HUD) */
+button.lang-fixed { position: fixed; top: 12px; right: 16px; width: auto; margin: 0; padding: 6px 12px; z-index: 10; }
