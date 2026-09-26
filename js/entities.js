@@ -19,14 +19,20 @@ function towerStats(def, level) {
   }
   return {
     damage: def.damage * Math.pow(def.dmgLvl || LVL_DMG, l),
-    range: def.range + LVL_RANGE * l,
-    rate: def.rate * Math.pow(LVL_RATE, l),
+    range: def.range + (def.rangeLvl ?? LVL_RANGE) * l,
+    rate: def.rate * Math.pow(def.rateLvl || LVL_RATE, l),
+    targets: targetsAt(def, level),
     poison: (def.poison || 0) * Math.pow(LVL_DMG, l),
     slow: def.slow ? Math.max(0.3, def.slow - (def.slowLvl || 0) * l) : 0,
     frail: def.frail ? def.frail + def.frailLvl * l : 0,
     stunChance: def.stunChance ? Math.min(0.8, def.stunChance + 0.04 * l) : 0,
     chain: def.chain ? def.chain + Math.floor(l / 3) : 0,
   };
+}
+
+// Скільки цілей (чи валунів) на рівні: базове число +1 на кожному рівні з targetLvls.
+function targetsAt(def, level) {
+  return (def.targets || 0) + (def.targetLvls || []).filter(v => level >= v).length;
 }
 
 // Відстань від точки до відрізка — для променя ока.
@@ -45,12 +51,19 @@ const DIRS = [
 ];
 
 const PATH_PX = PATH_POINTS.map(([c, r]) => cellCenter(c, r));
+// Пройдена відстань до кожної точки шляху — щоб поставити авантюриста на будь-яке місце (відкидання, поява).
+const PATH_LEN = PATH_PX.map(() => 0);
+for (let i = 1; i < PATH_PX.length; i++) {
+  PATH_LEN[i] = PATH_LEN[i - 1] + Math.hypot(PATH_PX[i].x - PATH_PX[i - 1].x, PATH_PX[i].y - PATH_PX[i - 1].y);
+}
 
 class Enemy {
   constructor(type, hpMul, rewardMul = 1, speedMul = 1) {
     const def = ENEMIES[type];
     this.type = type;
     this.def = def;
+    this.origin = type;   // тип-прабатько: воїн вершника й діти шута рахуються в рядку свого прабатька
+    this.muls = [hpMul, rewardMul, speedMul]; // множники набігу — для тих, хто з'являється з цього авантюриста
     this.color = def.color;
     this.radius = def.radius;
     this.baseSpeed = def.speed * speedMul;
@@ -141,9 +154,34 @@ class Enemy {
     if (this.wp >= PATH_PX.length) this.escaped = true;
   }
 
+  // Поставити на відстань p від входу (не далі кінця шляху).
+  setProgress(p) {
+    const end = PATH_LEN[PATH_LEN.length - 1];
+    p = Math.max(0, Math.min(p, end - 1));
+    let i = 1;
+    while (i < PATH_LEN.length - 1 && PATH_LEN[i] <= p) i++;
+    const a = PATH_PX[i - 1], b = PATH_PX[i];
+    const k = (p - PATH_LEN[i - 1]) / (PATH_LEN[i] - PATH_LEN[i - 1]);
+    this.x = a.x + (b.x - a.x) * k;
+    this.y = a.y + (b.y - a.y) * k;
+    this.dir = Math.atan2(b.y - a.y, b.x - a.x);
+    this.wp = i;
+    this.progress = p;
+  }
+
+  // Хто з'являється, коли цей авантюрист гине (воїн з-під вершника, половинки шута).
+  spawnOnDeath() {
+    return [];
+  }
+
   // pierce — урон крізь броню (отрута); src — тип монстра, якому зарахувати урон і вбивство
   hit(damage, pierce = false, src = null) {
     if (this.dead) return;
+    if (this.def.magicImmune && src && TOWERS[src].magic) {
+      // бойовий маг розсіює будь-яку магію — лише іскри
+      game.effects.push({ kind: 'spark', x: this.x, y: this.y, t: 0.25, max: 0.25, color: '#c78cff' });
+      return;
+    }
     this.sinceHit = 0;
     damage *= 1 + this.frail;
     if (!pierce && this.armor) damage = Math.max(damage * 0.2, damage - this.armor);
@@ -293,6 +331,7 @@ class Tower {
     this.level = 1;
     this.spent = this.def.cost;
     this.cooldown = 0;
+    this.buffs = [];      // бафи відьми на цей набіг: {kind: 'rate' | 'dmg', v}
     this.angle = -Math.PI / 2;
     if (this.def.fixedDir) this.setDir(3);
   }
@@ -320,8 +359,23 @@ class Tower {
     return this.inBeam(e, end.x, end.y);
   }
 
-  get damage() { return towerStats(this.def, this.level).damage; }
-  get range() { return towerStats(this.def, this.level).range * CELL; }
+  // Характеристики з урахуванням бафів відьми.
+  stats() {
+    const s = towerStats(this.def, this.level);
+    for (const b of this.buffs) {
+      if (b.kind === 'dmg') s.damage *= 1 + b.v;
+      else s.rate *= 1 - b.v;
+    }
+    return s;
+  }
+
+  // Чи може цей монстр атакувати авантюриста: невидимих — лише з detect, магія не бере бойового мага.
+  canHit(e) {
+    return alive(e) && (!e.hidden || this.def.detect) && !(this.def.magic && e.def.magicImmune);
+  }
+
+  get damage() { return this.stats().damage; }
+  get range() { return this.stats().range * CELL; }
   get upgradeCost() {
     return this.level >= MAX_LEVEL ? null : Math.round(this.def.cost * UPGRADE_COST_MUL * this.level);
   }
@@ -339,12 +393,12 @@ class Tower {
     let target = null;
     for (const e of game.enemies) {
       // біхолдер не повертається — стріляє, лише коли хтось на лінії його променя
-      if (!alive(e) || (e.hidden && !this.def.detect) || !this.reaches(e)) continue;
+      if (!this.canHit(e) || !this.reaches(e)) continue;
       if (!target || e.progress > target.progress) target = e;
     }
     if (!target) return;
     if (!this.def.fixedDir) this.angle = Math.atan2(target.y - this.y, target.x - this.x);
-    const s = towerStats(this.def, this.level);
+    const s = this.stats();
     const attack = this.def.attack || 'projectile';
     if (attack === 'aura') this.stomp(game, s);
     else if (attack === 'beam') this.beam(game, s);
@@ -950,7 +1004,8 @@ class Projectile {
     this.target = target;
     this.tx = target.x;
     this.ty = target.y;
-    const def = tower.def, s = towerStats(def, tower.level);
+    const def = tower.def, s = tower.stats();
+    this.tower = tower;
     this.speed = def.projSpeed;
     this.damage = s.damage;
     this.splash = def.splash ? def.splash * CELL : 0;
@@ -961,7 +1016,6 @@ class Projectile {
     this.poisonTime = def.poisonTime || 0;
     this.chain = s.chain;
     this.chainRange = (def.chainRange || 0) * CELL;
-    this.detect = !!def.detect;
     this.color = tower.def.color;
     this.kind = tower.type;
     this.src = tower.type;
@@ -1010,7 +1064,7 @@ class Projectile {
     for (let i = 0; i < this.chain; i++) {
       let next = null, best = this.chainRange;
       for (const e of game.enemies) {
-        if (!alive(e) || hit.has(e) || (e.hidden && !this.detect)) continue;
+        if (hit.has(e) || !this.tower.canHit(e)) continue;
         const d = Math.hypot(e.x - from.x, e.y - from.y);
         if (d <= best) { best = d; next = e; }
       }

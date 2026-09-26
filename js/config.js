@@ -35,7 +35,9 @@ const MAX_TOWERS = 18;        // скільки монстрів може жит
 // Необов'язкові механіки: splash, slow/slowTime, poison (урон/с крізь броню)/poisonTime,
 // chain (скільки разів перестрибує)/chainRange, stun (с)/stunChance, detect (бачить невидимих),
 // slowLvl (сповільнення міцнішає з рівнем), frail/frailLvl (ціль отримує +frail урону від усіх, поки сповільнена),
-// dmgLvl (свій множник урону за рівень замість LVL_DMG — для монстрів, що б'ють по натовпу), fixedDir (промінь б'є лише в обраний гравцем бік світу, а не в ціль), beamWidth (півширина променя, кл.).
+// dmgLvl (свій множник урону за рівень замість LVL_DMG — для монстрів, що б'ють по натовпу), rangeLvl/rateLvl (свої кроки
+// дальності й частоти замість LVL_RANGE/LVL_RATE), targets/targetLvls (скільки цілей і на яких рівнях +1),
+// magic (магічна атака — бойовий маг її не відчуває, тож такі монстри його не цілять), fixedDir (промінь б'є лише в обраний гравцем бік світу, а не в ціль), beamWidth (півширина променя, кл.).
 const TOWERS = {
   archer: {
     name: 'Скелет-лучник', color: '#e8dcc0', cost: 50,
@@ -44,7 +46,7 @@ const TOWERS = {
   },
   cannon: {
     name: 'Вогняний імп', color: '#ff7a2f', cost: 100,
-    damage: 22, range: 2.5, rate: 1.6, projSpeed: 300, splash: 1,
+    damage: 22, range: 2.5, rate: 1.6, projSpeed: 300, splash: 1, magic: true,
     desc: 'Повільний фаєрбол, вибух по площі',
   },
   frost: {
@@ -65,12 +67,12 @@ const TOWERS = {
   },
   lich: {
     name: 'Лич', color: '#b98cff', cost: 150,
-    damage: 22, range: 3, rate: 1.3, projSpeed: 700, chain: 3, chainRange: 1.8,
+    damage: 22, range: 3, rate: 1.3, projSpeed: 700, chain: 3, chainRange: 1.8, magic: true,
     desc: 'Блискавка перестрибує між авантюристами (−25% за стрибок)',
   },
   eye: {
     name: 'Біхолдер', color: '#ff4d6d', cost: 175, attack: 'beam', fixedDir: true, beamWidth: 1,
-    damage: 30, range: 5, rate: 2.2, detect: true, dmgLvl: 1.2,
+    damage: 30, range: 5, rate: 2.2, detect: true, dmgLvl: 1.2, magic: true,
     desc: 'Промінь у вибраний бік (↑↓←→) пробиває всіх на лінії, підсвічує невидимих',
   },
 };

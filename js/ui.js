@@ -57,13 +57,14 @@ function foeRow(type) {
 }
 
 // ---------- кнопки веж ----------
+const TOWER_KEYS = '1234567890-=';   // клавіші вибору монстра за порядком у TOWERS
 const towerButtons = {};
 Object.entries(TOWERS).forEach(([type, def], i) => {
   const btn = document.createElement('button');
   btn.className = 'tower-btn';
   btn.appendChild(towerIcon(type));
   btn.insertAdjacentHTML('beforeend',
-    `<span class="t-name">${def.name} <kbd>${i + 1}</kbd></span>` +
+    `<span class="t-name">${def.name} <kbd>${TOWER_KEYS[i]}</kbd></span>` +
     `<span class="t-cost">👻 ${def.cost}</span>` +
     `<span class="t-desc">${def.desc}</span>`);
   btn.addEventListener('click', () => selectTowerType(type));
@@ -187,7 +188,8 @@ document.addEventListener('keydown', startMusicOnce);
 // ---------- клавіатура ----------
 const towerTypes = Object.keys(TOWERS);
 document.addEventListener('keydown', e => {
-  if (e.key >= '1' && e.key <= String(towerTypes.length)) selectTowerType(towerTypes[+e.key - 1]);
+  const ti = e.key.length === 1 ? TOWER_KEYS.indexOf(e.key) : -1;
+  if (ti >= 0 && ti < towerTypes.length) selectTowerType(towerTypes[ti]);
   else if (e.key === 'Escape') cancelSelection();
   else if (e.key === ' ') { e.preventDefault(); if (!game.over) game.paused = !game.paused; }
   else if (e.key === 'Enter') { e.preventDefault(); startWave(); }

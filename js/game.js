@@ -92,22 +92,22 @@ function placeTower(type, col, row) {
 // Новий монстр; біхолдер одразу дивиться туди, де на лінії його променя найбільше коридору.
 function newTower(type, col, row) {
   const t = new Tower(type, col, row);
-  if (t.def.fixedDir) t.setDir(bestDir(col, row, t.def.range));
+  if (t.def.fixedDir) t.setDir(bestDir(col, row, t.def));
   return t;
 }
 
-function bestDir(col, row, range) {
+function bestDir(col, row, def) {
   let best = 3, bestN = -1;
   DIRS.forEach((d, i) => {
-    const n = beamCoverage(col, row, range, i);
+    const n = beamCoverage(col, row, def.range, def.beamWidth || 0, i);
     if (n > bestN) { bestN = n; best = i; }
   });
   return best;
 }
 
-// Скільки клітинок коридору накриває смуга променя біхолдера з клітинки col,row у бік dir.
-function beamCoverage(col, row, range, dir) {
-  const d = DIRS[dir], half = TOWERS.eye.beamWidth;
+// Скільки клітинок коридору накриває смуга (промінь біхолдера, кидок орка) з клітинки col,row у бік dir.
+function beamCoverage(col, row, range, half, dir) {
+  const d = DIRS[dir];
   let n = 0;
   for (const key of PATH_CELLS) {
     const [c, r] = key.split(',').map(Number);
@@ -179,11 +179,13 @@ function update(dt) {
   for (const fx of game.effects) fx.t -= dt;
   game.heartFlash = Math.max(0, game.heartFlash - dt);
 
+  const born = [];   // ті, хто з'явився із загиблих (воїн вершника, половинки шута)
   game.enemies = game.enemies.filter(e => {
-    if (e.dead) { game.money += e.reward; return false; }
+    if (e.dead) { game.money += e.reward; born.push(...e.spawnOnDeath()); return false; }
     if (e.escaped) { game.lives -= e.lifeDmg; game.heartFlash = 0.5; return false; }
     return true;
   });
+  game.enemies.push(...born);
   game.projectiles = game.projectiles.filter(p => !p.done);
   game.effects = game.effects.filter(fx => fx.t > 0);
 
@@ -496,6 +498,18 @@ function drawEffect(fx) {
         const px = Math.cos(a) * reach * f, py = Math.sin(a) * reach * f;
         if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
       }
+    }
+    ctx.stroke();
+  } else if (fx.kind === 'spark') {
+    // розсіяна магія чи відбитий снаряд: кілька іскор урізнобіч
+    ctx.strokeStyle = fx.color;
+    ctx.globalAlpha = k;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    for (let i = 0; i < 6; i++) {
+      const a = i * Math.PI / 3 + fx.x, r1 = 6 + (1 - k) * 6, r2 = r1 + 5;
+      ctx.moveTo(fx.x + Math.cos(a) * r1, fx.y + Math.sin(a) * r1);
+      ctx.lineTo(fx.x + Math.cos(a) * r2, fx.y + Math.sin(a) * r2);
     }
     ctx.stroke();
   } else if (fx.kind === 'quake') {
