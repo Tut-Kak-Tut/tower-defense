@@ -1,7 +1,0 @@
-services:
-  game:
-    build: .
-    image: dungeon-heart
-    ports:
-      - "8001:80"
-    restart: unless-stopped
