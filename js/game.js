@@ -97,15 +97,14 @@ function placeTower(type, col, row) {
   return true;
 }
 
-// Зілля відьми: двом випадковим монстрам, що б'ють, — одному частота атаки, другому урон.
+// Зілля відьми: targets випадковим монстрам, що б'ють, — по черзі частота атаки, урон, частота, урон...
 const BREWABLE = t => !['web', 'haunt', 'buff', 'manual'].includes(t.def.attack);
 function brew(witch) {
   const pool = game.towers.filter(BREWABLE);
-  const v = towerStats(witch.def, witch.level).buff;
-  for (const kind of ['rate', 'dmg']) {
-    if (!pool.length) return;
+  const s = towerStats(witch.def, witch.level);
+  for (let i = 0; i < s.targets && pool.length; i++) {
     const t = pool.splice(Math.floor(Math.random() * pool.length), 1)[0];
-    t.buffs.push({ kind, v, from: witch });
+    t.buffs.push({ kind: i % 2 ? 'dmg' : 'rate', v: s.buff, from: witch });
   }
 }
 
@@ -152,7 +151,7 @@ function upgradeTower(tower) {
   game.money -= cost;
   tower.spent += cost;
   tower.level++;
-  // орк на 5-му і 10-му рівні одразу отримує ще один валун
+  // якщо з рівнем валунів більшає (targets у setLevel), орк одразу отримує новий
   if (tower.def.attack === 'manual') tower.boulders += targetsAt(tower.def, tower.level) - targetsAt(tower.def, tower.level - 1);
   return true;
 }
@@ -593,7 +592,7 @@ function draw() {
     ctx.fillRect(col * CELL, row * CELL, CELL, CELL);
     const ghost = newTower(ui.placing, col, row);
     if (ghost.def.fixedDir) drawBeamLine(ghost, ok);
-    else if (ghost.range) drawRange(ghost.x, ghost.y, ghost.range, ok, ghost.def.minRange);
+    else if (ghost.range) drawRange(ghost.x, ghost.y, ghost.range, ok, ghost.minRange);
     ctx.globalAlpha = 0.55;
     ghost.draw(ctx);
     ctx.globalAlpha = 1;
@@ -602,7 +601,7 @@ function draw() {
   if (ui.selected) {
     const t = ui.selected;
     if (t.def.fixedDir) drawBeamLine(t, true);
-    else if (t.range) drawRange(t.x, t.y, t.range, true, t.def.minRange);
+    else if (t.range) drawRange(t.x, t.y, t.range, true, t.minRange);
   }
 
   for (const t of game.towers) t.draw(ctx);

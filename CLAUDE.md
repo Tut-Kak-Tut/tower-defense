@@ -7,7 +7,7 @@ Tower defense у браузері в темі підземелля: гравец
 ## Стек
 HTML5 Canvas + чистий JavaScript, без збірки і залежностей (шрифт Cinzel з Google Fonts, фолбек Georgia).
 Скрипти — звичайні `<script>` (не ES-модулі), щоб працювало з `file://`. Порядок підключення важливий:
-`config.js` → `entities.js` → `game.js` → `ui.js`. Усі мають спільну глобальну область видимості.
+`config.js` → `monsters/monster.js` → `monsters/monsters.js` → `adventurers/adventurer.js` → `adventurers/adventurers.js` → `entities.js` → `game.js` → `ui.js`. Усі мають спільну глобальну область видимості.
 
 ## Тема ↔ код
 Код лишився з TD-назвами: `Tower` = монстр, `Enemy` = авантюрист, `money` = душі, `lives` = міцність Серця,
@@ -17,21 +17,28 @@ HTML5 Canvas + чистий JavaScript, без збірки і залежнос�
 `priest` жрець, `mage` маг, `scout` розвідник, `knight` вершник, `jester` шут, `blade` майстер меча, `hero` герой-бос.
 
 ## Структура
-- `js/config.js` — УВЕСЬ баланс: мапа/шлях, факели, ліміт монстрів `MAX_TOWERS`, `TOWERS`/`ENEMIES` (механіки описані коментарями над ними),
-  рівні (`MAX_LEVEL`, `LVL_*`), набіги: `FIRST_WAVES` (1–10 вручну) + генератор `waveGroups(n)`
-  із загонів `SQUADS` (розклад появи `ENEMY_UNLOCK`, бюджет набігу за «загрозою» `threat`, бос кожні 10, тематичний кожні 5),
+- `js/config.js` — баланс (крім монстрів і авантюристів — вони в `js/monsters/` і `js/adventurers/`): мапа/шлях, факели, ліміт монстрів `MAX_TOWERS`,
+  `MAX_LEVEL`, набіги: `FIRST_WAVES` (1–10 вручну) + генератор `waveGroups(n)`
+  із загонів `SQUADS` (розклад появи `ENEMY_UNLOCK` — заповнюється з `setUnlockWave`, бюджет набігу за «загрозою» `threat`, бос кожні 10, тематичний кожні 5),
   криві `waveSize(n)` / `hpMul(n)` / `rewardMul(n)` / `speedMul(n)`, `hash()`.
   Група набігу — `[тип, кількість, інтервал, пауза?]`: група з паузою починає новий загін; у загоні ніхто не обганяє
   попереднього (`Enemy.leader`, `FORMATION_GAP`), тож стрій «авангард → основа → тил» тримається.
+- `js/monsters/monster.js` — `Monster` (вид монстра) і `MonsterBuilder`: `set…` задають 1-й рівень, `setLevel(N, {upgradeCost, стат…})` —
+  що змінюється на рівні N (решта переходить з попереднього). `build()` перевіряє поля/рівні й кладе монстра в реєстр `TOWERS` (оголошений тут же); види атаки описані над `ATTACKS`,
+  рівні зберігаються як `def.levels` (масиви на 10 рівнів + `upgrade`), `towerStats()` читає їх за `LEVEL_STATS`.
+- `js/monsters/monsters.js` — самі монстри: по ланцюжку `new MonsterBuilder(id)…build()` на кожного. Баланс монстрів правити тут.
+- `js/adventurers/adventurer.js` — `Adventurer` (вид авантюриста) і `AdventurerBuilder`; реєстри `ENEMIES`, `ENEMY_UNLOCK`, `SPAWN_GAP` заповнює `build()`
+  (перевіряє обов'язкові поля, набіг появи після 10-го не кратний 5, `setSpawnOnDeath` — лише на вже оголошеного).
+- `js/adventurers/adventurers.js` — самі авантюристи ланцюжками `new AdventurerBuilder(id)…build()`; порядок = порядок у бестіарії.
 - `js/entities.js` — `towerStats(def, level)` (усі характеристики на рівні — і для гри, і для UI; `Tower.stats()` — те саме
-  з бафами відьми `tower.buffs`, у грі брати його), `targetsAt()` (цілі/валуни за `targets`/`targetLvls`), `Enemy`
+  з бафами відьми `tower.buffs`, у грі брати його), `targetsAt()` (цілі/валуни на рівні), `Enemy`
   (`setProgress(p)` ставить на будь-яке місце шляху за `PATH_LEN`; `spawnOnDeath()` — воїн вершника, половинки шута,
   їм ставиться `summoned` і `origin` — панель набігу рахує за `origin`; `speed` — з прискоренням паладина `hasted`;
   `lastStand` гнома; магія: `hit()` нічого не робить `magicImmune`, якщо `TOWERS[src].magic`, а `Tower.canHit(e)` — хто
   кого взагалі може цілити),
   (броня/щит/отрута/лікування/оглушення/невидимість через `hidden`/`revealed`), `Tower` (атаки `projectile`/`aura`/`beam`/`web` — павук раз на `rate` стріляє павутиною в конус `cone` перед собою — усі в ньому стоять `hold` с через `stun(t, webbed)` (кокон замість зірочок, ефект `cone`), без урону; з рівнем ростуть утримання, дальність і частота,
   детектори підсвічують невидимих; біхолдер `fixedDir` б'є смугою `beamWidth` у бік `dir` з `DIRS`, зона дії — `reaches(e)`
-  (з мертвою зоною `minRange`); `haunt` привида, `drain` вампіра (`links` + `drawLinks`), `cleave` лат, `buff` і `manual` —
+  (з мертвою зоною `minRange`); `haunt` привида, `drain` вампіра (`links` + `drawLinks`), `cleave` лат (ближній удар + фізичний сплеш `splash` навколо цілі), `buff` і `manual` —
   без власної атаки), `Boulder` (валун орка живе в `game.projectiles`: відкидає назад через `setProgress`, крім `steadfast`),
   `Projectile` (сплеш, сповільнення, отрута, ланцюг `jump`),
   малювання: `drawAdventurer` (switch за типом), монстри через мапу `TOWER_DRAW`.
@@ -52,8 +59,8 @@ HTML5 Canvas + чистий JavaScript, без збірки і залежнос�
 ## Правила
 - Графіка — лише примітиви Canvas, без картинок.
 - Відстані в config — у клітинках (`CELL` = 40px), швидкості ворогів — px/с.
-- Новий монстр = запис у `TOWERS` + функція малювання в `TOWER_DRAW`; новий авантюрист = запис у `ENEMIES` + `case` у `drawAdventurer()`
-  + (для генератора) `ENEMY_UNLOCK`, `SPAWN_GAP` і місце хоча б в одному загоні `SQUADS`. Нова механіка монстра, що росте з рівнем, — у `towerStats()` і рядок у `refreshUpgrade`.
+- Новий монстр = ланцюжок `MonsterBuilder` у `monsters.js` (з `setLevel` на 2…10) + функція малювання в `TOWER_DRAW`; новий авантюрист = ланцюжок `AdventurerBuilder` в `adventurers.js` (з `setSpawnGap`, для генератора `setUnlockWave`)
+  + `case` у `drawAdventurer()` + місце хоча б в одному загоні `SQUADS`. Нова характеристика, що росте з рівнем, — ключ у `LEVEL_STATS` (monster.js), рядок у `refreshUpgrade` і `levelGains`.
 - Набіг відкриття нового типу — не кратний 5 (там тематичні/бос-набіги, новачок не потрапить першим).
 - Склад набігів детермінований (`hash`), бо панель показує його наперед — не використовуй там `Math.random`.
 - Статичне малюємо в `buildMapLayer()` (з `hash()`, щоб не мерехтіло); анімації — через глобальний `time`, не через ігровий `dt`.

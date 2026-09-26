@@ -4,40 +4,23 @@ function cellCenter(col, row) {
   return { x: col * CELL + CELL / 2, y: row * CELL + CELL / 2 };
 }
 
+// Значення характеристики на рівні: з def.levels (setLevel у js/monsters/monsters.js), а якщо вона не росте — з 1-го рівня.
+function levelValue(def, key, level) {
+  return def.levels[key]?.[level - 1] ?? (def[key] || 0);
+}
+
 // Характеристики монстра на заданому рівні — і для гри, і для підказки про посилення.
 // range — у клітинках, rate — секунд між атаками.
 function towerStats(def, level) {
-  const l = level - 1;
-  if (def.attack === 'web') {
-    // павутина конусом: без урону, ростуть утримання, дальність і частота пострілів
-    return {
-      damage: 0, poison: 0, slow: 0, frail: 0, stunChance: 0, chain: 0,
-      rate: def.rate * Math.pow(LVL_RATE, l),
-      range: def.range + def.webRangeLvl * l,
-      hold: def.hold + def.holdLvl * l,
-    };
-  }
-  const dmgMul = Math.pow(def.dmgLvl || LVL_DMG, l);
-  return {
-    damage: def.damage * dmgMul,
-    damageMax: (def.damageMax || 0) * dmgMul,
-    cleave: def.cleave ? def.cleave + def.cleaveLvl * l : 0,
-    buff: def.buff ? def.buff + def.buffLvl * l : 0,
-    knock: def.knock ? def.knock + def.knockLvl * l : 0,
-    range: def.range + (def.rangeLvl ?? LVL_RANGE) * l,
-    rate: def.rate * Math.pow(def.rateLvl || LVL_RATE, l),
-    targets: targetsAt(def, level),
-    poison: (def.poison || 0) * Math.pow(LVL_DMG, l),
-    slow: def.slow ? Math.max(0.3, def.slow - (def.slowLvl || 0) * l) : 0,
-    frail: def.frail ? def.frail + def.frailLvl * l : 0,
-    stunChance: def.stunChance ? Math.min(0.8, def.stunChance + 0.04 * l) : 0,
-    chain: def.chainRange ? targetsAt(def, level) - 1 : 0,
-  };
+  const s = {};
+  for (const key of LEVEL_STATS) s[key] = levelValue(def, key, level);
+  s.chain = def.chainRange ? s.targets - 1 : 0;
+  return s;
 }
 
-// Скільки цілей (чи валунів) на рівні: базове число +1 на кожному рівні з targetLvls.
+// Скільки цілей (чи валунів) на рівні.
 function targetsAt(def, level) {
-  return (def.targets || 0) + (def.targetLvls || []).filter(v => level >= v).length;
+  return levelValue(def, 'targets', level);
 }
 
 // Відстань від точки до відрізка — для променя ока.
@@ -222,8 +205,9 @@ class Enemy {
     return out;
   }
 
-  // pierce — урон крізь броню (отрута); src — тип монстра, якому зарахувати урон і вбивство
+  // pierce — урон крізь броню (отрута, монстри з armorPierce); src — тип монстра, якому зарахувати урон і вбивство
   hit(damage, pierce = false, src = null) {
+    if (src && TOWERS[src].armorPierce) pierce = true;
     if (this.dead) return;
     if (this.def.magicImmune && src && TOWERS[src].magic) {
       // бойовий маг розсіює будь-яку магію — лише іскри
@@ -432,7 +416,7 @@ class Tower {
   reaches(e) {
     if (!this.def.fixedDir) {
       const d = Math.hypot(e.x - this.x, e.y - this.y);
-      return d <= this.range + e.radius && d >= (this.def.minRange || 0) * CELL;
+      return d <= this.range + e.radius && d >= this.minRange * CELL;
     }
     const end = this.beamEnd();
     return this.inBeam(e, end.x, end.y);
@@ -455,8 +439,9 @@ class Tower {
 
   get damage() { return this.stats().damage; }
   get range() { return this.stats().range * CELL; }
+  get minRange() { return this.stats().minRange; }  // мертва зона, кл.
   get upgradeCost() {
-    return this.level >= MAX_LEVEL ? null : Math.round(this.def.cost * UPGRADE_COST_MUL * this.level);
+    return this.level >= MAX_LEVEL ? null : this.def.levels.upgrade[this.level - 1];
   }
   get sellValue() { return Math.floor(this.spent * SELL_REFUND); }
 
@@ -536,13 +521,15 @@ class Tower {
     ctx.restore();
   }
 
-  // живі лати: удар по цілі, і легких, що йдуть впритул до неї, зачіпає тим самим замахом
+  // живі лати: удар по цілі поруч, і той самий замах зачіпає всіх у splash кл. від неї (фізичний урон);
+  // великих (big) — лише на частку splashBig
   cleave(game, s, target) {
-    const rad = s.cleave * CELL;
+    const rad = s.splash * CELL;
     target.hit(s.damage, false, this.type);
     for (const e of game.enemies) {
-      if (e === target || !e.def.light || !this.canHit(e)) continue;
-      if (Math.hypot(e.x - target.x, e.y - target.y) <= rad + e.radius) e.hit(s.damage, false, this.type);
+      if (e === target || !this.canHit(e)) continue;
+      const dmg = e.def.big ? s.damage * (this.def.splashBig ?? 1) : s.damage;
+      if (dmg > 0 && Math.hypot(e.x - target.x, e.y - target.y) <= rad + e.radius) e.hit(dmg, false, this.type);
     }
     game.effects.push({ kind: 'slash', x: target.x, y: target.y, a: this.angle, r: rad, t: 0.25, max: 0.25, color: '#dfe6f2' });
   }
@@ -1514,14 +1501,14 @@ class Projectile {
     this.tower = tower;
     this.speed = def.projSpeed;
     this.damage = s.damage;
-    this.splash = def.splash ? def.splash * CELL : 0;
+    this.splash = s.splash * CELL;
     this.slow = s.slow;
     this.frail = s.frail;
     this.slowTime = def.slowTime || 0;
     this.poison = s.poison;
     this.poisonTime = def.poisonTime || 0;
     this.chain = s.chain;
-    this.chainRange = (def.chainRange || 0) * CELL;
+    this.chainRange = s.chainRange * CELL;
     this.color = tower.def.color;
     this.kind = tower.type;
     this.src = tower.type;

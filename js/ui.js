@@ -295,7 +295,7 @@ function enemyTraits(def) {
   if (def.spawn) t.push(`гинучи, лишає: ${ENEMIES[def.spawn].name.toLowerCase()}`);
   if (def.split) t.push(`ділиться ${def.split} рази`);
   if (def.deflect) t.push(`відбиває ${Math.round(def.deflect * 100)}% снарядів`);
-  if (def.light) t.push('легкий обладунок');
+  if (def.big) t.push('великий');
   if (def.heal) t.push('лікує');
   if (def.stealth) t.push('невидимий');
   if (def.lifeDmg) t.push(`Серцю −${def.lifeDmg}`);
@@ -321,6 +321,30 @@ function refreshBestiary() {
 let upKey = null; // таблиця й іконка перебудовуються лише коли змінився монстр чи його рівень
 let upTower = null;
 
+// Що дасть наступний рівень — одним реченням, з різниці характеристик (прокачка задана в setLevel, тож може бути будь-якою).
+function levelGains(attack, now, next) {
+  const signed = (v, digits = 2) => (v < 0 ? '−' : '+') + +Math.abs(v).toFixed(digits);
+  const pct = (a, b) => signed((b / a - 1) * 100, 0) + '%';
+  const out = [];
+  const add = (key, text) => { if (next[key] !== now[key]) out.push(text(now[key], next[key])); };
+  add('damage', (a, b) => (attack === 'drain' ? 'висмоктування ' : 'урон ') + (a ? pct(a, b) : `${Math.round(a)} → ${Math.round(b)}`));
+  add('range', (a, b) => `${attack === 'haunt' ? 'туман' : 'дальність'} ${signed(b - a)} кл.`);
+  add('rate', (a, b) => attack === 'drain' ? `розгін ${b < a ? 'швидший' : 'повільніший'}`
+    : `${attack === 'web' ? 'постріли' : 'атака'} на ${Math.round(Math.abs(1 - b / a) * 100)}% ${b < a ? 'частіше' : 'рідше'}`);
+  add('targets', (a, b) => `${attack === 'manual' ? 'валунів' : 'цілей'} ${a} → ${b}`);
+  add('hold', (a, b) => `утримання ${signed(b - a, 1)}с`);
+  add('slow', (a, b) => `невидимі мерзнуть ${b < a ? 'дужче' : 'слабше'}`);
+  add('frail', (a, b) => `крихкість ${signed((b - a) * 100, 1)}%`);
+  add('stunChance', (a, b) => `шанс оглушення ${signed((b - a) * 100, 0)}%`);
+  add('splash', (a, b) => `${attack === 'cleave' ? 'удар по площі' : 'вибух'} ${signed(b - a)} кл.`);
+  add('buff', (a, b) => `зілля ${signed((b - a) * 100, 0)}%`);
+  add('knock', (a, b) => `відкидання ${signed(b - a, 1)} кл.`);
+  add('chainRange', (a, b) => `стрибок ${signed(b - a, 1)} кл.`);
+  add('minRange', (a, b) => `мертва зона ${signed(b - a)} кл.`);
+  add('poison', (a, b) => `отрута ${a ? pct(a, b) : '+' + Math.round(b)}`);
+  return out.join(', ') || 'характеристики не змінюються';
+}
+
 function refreshUpgrade() {
   const t = ui.selected;
   $('upEmpty').classList.toggle('hidden', !!t);
@@ -343,20 +367,8 @@ function refreshUpgrade() {
     const now = towerStats(def, t.level);
     const next = maxed ? null : towerStats(def, t.level + 1);
     const attack = def.attack || 'projectile';
-    // що росте з рівнем — одним реченням (функції, бо поля на кшталт targetLvls є не в усіх)
-    const dmgUp = `урон +${Math.round(((def.dmgLvl || LVL_DMG) - 1) * 100)}%`;
-    const grows = ({
-      web: () => 'павутина тримає довше, летить далі, постріли частіші',
-      haunt: () => 'туман ширший, крихкість сильніша, невидимі мерзнуть дужче',
-      drain: () => `${dmgUp}, розгін швидший, ще ціль на ${def.targetLvls.join('/')} рівнях`,
-      buff: () => `зілля сильніше на ${Math.round(def.buffLvl * 100)}%`,
-      manual: () => `валун відкидає далі, ще валун на ${def.targetLvls.join(' і ')} рівнях`,
-    }[attack] || (() => [
-      def.dmgLvl !== 1 && dmgUp,
-      `дальність +${+(def.rangeLvl ?? LVL_RANGE).toFixed(2)} кл.`,
-      `атака на ${Math.round((1 - (def.rateLvl || LVL_RATE)) * 100)}% частіше`,
-    ].filter(Boolean).join(', ')))();
-    $('upDesc').textContent = maxed ? `${def.desc}. Монстр досяг найвищого рівня.` : `${def.desc}. Посилення: ${grows}.`;
+    $('upDesc').textContent = maxed ? `${def.desc}. Монстр досяг найвищого рівня.`
+      : `${def.desc}. Посилення: ${levelGains(attack, now, next)}.`;
 
     const rows = [];
     // незмінні з рівнем — однакові в обох колонках
@@ -375,7 +387,7 @@ function refreshUpgrade() {
       stat('Дальність', range);
     } else if (attack === 'buff') {
       stat('Зілля', s => `+${Math.round(s.buff * 100)}%`);
-      fixed('Кому', '2 випадкові монстри');
+      stat('Кому', s => `${s.targets} випадк. монстр${s.targets === 1 ? 'у' : 'ам'}`);
     } else if (attack === 'manual') {
       stat('Валуни', s => `${Math.min(t.boulders, s.targets)} / ${s.targets}`);
       stat('Відкидання', s => s.knock.toFixed(1) + ' кл.');
@@ -389,17 +401,19 @@ function refreshUpgrade() {
       stat('Урон', s => Math.round(s.damage));
       stat('Дальність', range);
       stat('Атака', s => s.rate.toFixed(2) + 'с');
-      if (def.splash) fixed('Вибух', def.splash + ' кл.');
-      if (def.minRange) fixed('Мертва зона', `ближче ${def.minRange} кл.`);
-      if (def.cleave) stat('Зачіпає легких', s => `у ${s.cleave.toFixed(2)} кл.`);
+      if (def.splash) stat(attack === 'cleave' ? 'Удар по площі' : 'Вибух', s => +s.splash.toFixed(2) + ' кл.');
+      if (def.splashBig !== undefined) fixed('Великим по площі', def.splashBig ? Math.round(def.splashBig * 100) + '% урону' : 'не зачіпає');
+      if (def.minRange) stat('Мертва зона', s => `ближче ${+s.minRange.toFixed(2)} кл.`);
       if (def.slow) stat('Сповільнення', s => `${Math.round((1 - s.slow) * 100)}% · ${def.slowTime}с`);
       if (def.frail) stat('Крихкість', s => `+${Math.round(s.frail * 100)}% урону`);
       if (def.poison) stat('Отрута', s => `${Math.round(s.poison)}/с · ${def.poisonTime}с`);
       if (def.chainRange) stat('Цілей', s => s.chain + 1);
+      if (def.chainRange) stat('Стрибок', s => s.chainRange.toFixed(1) + ' кл.');
       if (def.stun) stat('Оглушення', s => `${Math.round(s.stunChance * 100)}% · ${def.stun}с`);
       if (attack === 'beam') fixed('Промінь', def.fixedDir ? 'смуга' : 'крізь усіх');
     }
     if (def.magic) fixed('Магія', 'маг не відчуває');
+    if (def.armorPierce) fixed('Броня', 'ігнорує');
     for (const b of t.buffs) fixed(b.kind === 'rate' ? 'Зілля швидкості' : 'Зілля сили', `+${Math.round(b.v * 100)}%`);
     if (def.detect) fixed('Підсвічує невидимих', 'так');
 
