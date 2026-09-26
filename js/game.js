@@ -97,8 +97,19 @@ function placeTower(type, col, row) {
   return true;
 }
 
+// Кладовище рахує кожну смерть авантюриста (і половинок шута, і воїна вершника); кожна every-та дає душі.
+function graveDeath() {
+  for (const t of game.towers) {
+    if (t.def.attack !== 'grave' || ++t.deaths < t.def.every) continue;
+    t.deaths = 0;
+    const souls = t.stats().souls;
+    game.money += souls;
+    game.effects.push({ kind: 'souls', x: t.x, y: t.y - 14, text: `+${souls} 👻`, color: '#9dffc4', t: 1.4, max: 1.4 });
+  }
+}
+
 // Зілля відьми: targets випадковим монстрам, що б'ють, — по черзі частота атаки, урон, частота, урон...
-const BREWABLE = t => !['web', 'haunt', 'buff', 'manual'].includes(t.def.attack);
+const BREWABLE = t => !['web', 'haunt', 'buff', 'manual', 'grave'].includes(t.def.attack);
 function brew(witch) {
   const pool = game.towers.filter(BREWABLE);
   const s = towerStats(witch.def, witch.level);
@@ -214,7 +225,7 @@ function update(dt) {
 
   const born = [];   // ті, хто з'явився із загиблих (воїн вершника, половинки шута)
   game.enemies = game.enemies.filter(e => {
-    if (e.dead) { game.money += e.reward; born.push(...e.spawnOnDeath()); return false; }
+    if (e.dead) { game.money += e.reward; graveDeath(); born.push(...e.spawnOnDeath()); return false; }
     if (e.escaped) { game.lives -= e.lifeDmg; game.heartFlash = 0.5; return false; }
     return true;
   });
@@ -562,6 +573,15 @@ function drawEffect(fx) {
     ctx.beginPath();
     ctx.arc(fx.x, fx.y, Math.max(12, fx.r), fx.a - 1.3 + sweep, fx.a - 0.2 + sweep);
     ctx.stroke();
+  } else if (fx.kind === 'souls') {
+    // душі з кладовища: напис спливає вгору й тане
+    ctx.globalAlpha = Math.min(1, k * 2);
+    ctx.fillStyle = fx.color;
+    ctx.shadowColor = fx.color;
+    ctx.shadowBlur = 8;
+    ctx.font = 'bold 14px Cinzel, Georgia, serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(fx.text, fx.x, fx.y - (1 - k) * 22);
   } else if (fx.kind === 'quake') {
     // удар голема: кільце, що розходиться по землі
     ctx.strokeStyle = fx.color;

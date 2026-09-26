@@ -5,7 +5,7 @@ const TOWERS = {};  // реєстр видів монстрів за id: зап�
 
 // Характеристики, що можуть змінюватися з рівнем (setLevel). Відстані — у клітинках, rate — секунд між атаками.
 const LEVEL_STATS = ['damage', 'damageMax', 'range', 'rate', 'targets', 'hold', 'slow', 'frail', 'stunChance',
-  'splash', 'buff', 'knock', 'poison', 'chainRange', 'minRange'];
+  'splash', 'buff', 'knock', 'poison', 'chainRange', 'minRange', 'souls'];
 
 // Види атаки (setAttack):
 //   projectile — снаряд в одну ціль (за замовчуванням); aura — б'є всіх у радіусі; beam — промінь крізь усіх на лінії;
@@ -14,8 +14,9 @@ const LEVEL_STATS = ['damage', 'damageMax', 'range', 'rate', 'targets', 'hold', 
 //   cleave — ближній бій: удар по найближчому в range, фізичний урон усім у splash кл. від нього;
 //   buff — відьма: перед набігом бафає двох випадкових атакуючих монстрів на buff (одному частоту, другому урон);
 //   manual — орк: сам не атакує, гравець подвійним кліком кидає валун (див. Boulder);
-//   web — павук раз на rate с стріляє павутиною в конус cone°: усі в ньому стоять hold с (бос — вдвічі менше).
-const ATTACKS = ['projectile', 'aura', 'beam', 'haunt', 'drain', 'cleave', 'buff', 'manual', 'web'];
+//   web — павук раз на rate с стріляє павутиною в конус cone°: усі в ньому стоять hold с (бос — вдвічі менше);
+//   grave — кладовище: сам не атакує, кожна every-та смерть авантюриста на мапі дає souls душ.
+const ATTACKS = ['projectile', 'aura', 'beam', 'haunt', 'drain', 'cleave', 'buff', 'manual', 'web', 'grave'];
 
 class Monster {
   // Створює лише MonsterBuilder.build(): params — усі поля, levels — { стат: [значення на рівнях 1…MAX_LEVEL],
@@ -72,6 +73,7 @@ class MonsterBuilder {
   setDrain(dmgMax, rampSeconds) { this.set('damageMax', dmgMax); return this.set('ramp', rampSeconds); } // вампір
   setBuff(part) { return this.set('buff', part); }                  // котел відьми
   setKnock(cells) { return this.set('knock', cells); }              // валун орка
+  setSouls(souls, every) { this.set('souls', souls); return this.set('every', every); } // кладовище: souls душ за кожні every смертей
 
   // Що змінюється на рівні level (2…MAX_LEVEL): { upgradeCost, damage, range, ... }.
   // Чого не вказано — лишається як на попередньому рівні.

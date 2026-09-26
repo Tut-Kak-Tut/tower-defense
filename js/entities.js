@@ -397,6 +397,7 @@ class Tower {
     if (this.def.fixedDir) this.setDir(3);
     if (this.def.attack === 'manual') this.boulders = targetsAt(this.def, 1);  // валуни орка
     if (this.def.attack === 'drain') this.links = new Map();                  // цілі вампіра → секунди висмоктування
+    if (this.def.attack === 'grave') this.deaths = 0;                         // смерті до наступних душ кладовища
   }
 
   setDir(dir) {
@@ -456,7 +457,7 @@ class Tower {
       }
     }
     const attack = this.def.attack || 'projectile';
-    if (attack === 'buff' || attack === 'manual') return;   // відьма й орк самі не атакують
+    if (attack === 'buff' || attack === 'manual' || attack === 'grave') return;   // відьма, орк і кладовище самі не атакують
     if (attack === 'haunt') { this.haunt(game, this.stats()); return; }
     if (attack === 'drain') { this.drain(game, dt, this.stats()); return; }
     this.cooldown -= dt;
@@ -1422,11 +1423,56 @@ function drawCarriedBoulders(ctx, n) {
   }
 }
 
+// кладовище: три надгробки, хрест і туман, що стелиться між ними
+function drawGrave(ctx) {
+  ctx.strokeStyle = 'rgba(0,0,0,0.55)';
+  ctx.lineWidth = 1.2;
+  // горбики землі
+  ctx.fillStyle = '#3b3228';
+  for (const [gx, gy] of [[-9, 9], [9, 9], [0, 12]]) {
+    ctx.beginPath();
+    ctx.ellipse(gx, gy, 6.5, 2.8, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  // бічні надгробки — заокруглені плити
+  ctx.fillStyle = '#6d7a73';
+  for (const s of [-1, 1]) {
+    const gx = s * 9;
+    ctx.beginPath();
+    ctx.moveTo(gx - 5, 9); ctx.lineTo(gx - 5, -1); ctx.arc(gx, -1, 5, Math.PI, 0); ctx.lineTo(gx + 5, 9);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = 'rgba(0,0,0,0.35)';
+    ctx.fillRect(gx - 2.5, 0, 5, 1.2);
+    ctx.fillRect(gx - 2.5, 3, 5, 1.2);
+    ctx.fillStyle = '#6d7a73';
+  }
+  // хрест посередині
+  ctx.fillStyle = TOWERS.grave.color;
+  ctx.fillRect(-2, -15, 4, 27);
+  ctx.fillRect(-7, -9, 14, 4);
+  ctx.strokeRect(-2, -15, 4, 27);
+  ctx.strokeRect(-7, -9, 14, 4);
+  // зелений туман, що дихає
+  ctx.save();
+  ctx.globalAlpha = 0.25 + Math.sin(time * 1.5) * 0.08;
+  ctx.fillStyle = '#9dffc4';
+  for (let i = 0; i < 3; i++) {
+    const ph = (time * 0.3 + i / 3) % 1;
+    ctx.beginPath();
+    ctx.ellipse(-12 + ph * 24, 10 - i * 2, 7, 2.2, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
 // Малюнок монстра за ключем — і на полі, і в іконках.
 const TOWER_DRAW = {
   archer: drawSkeleton, cannon: drawImp, frost: drawGhost,
   spider: drawSpider, golem: drawGolem, lich: drawLich, eye: drawBeholder,
   slime: drawSlime, vampire: drawVampire, plate: drawPlate, witch: drawWitch, orc: drawOrc,
+  grave: drawGrave,
 };
 
 // Валун орка: котиться смугою в бік tower.dir, відкидає кожного зачепленого назад по коридору

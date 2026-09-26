@@ -57,7 +57,7 @@ function foeRow(type) {
 }
 
 // ---------- кнопки веж ----------
-const TOWER_KEYS = '1234567890-=';   // клавіші вибору монстра за порядком у TOWERS
+const TOWER_KEYS = '1234567890-=[';   // клавіші вибору монстра за порядком у TOWERS
 const towerButtons = {};
 Object.entries(TOWERS).forEach(([type, def], i) => {
   const btn = document.createElement('button');
@@ -338,6 +338,7 @@ function levelGains(attack, now, next) {
   add('stunChance', (a, b) => `шанс оглушення ${signed((b - a) * 100, 0)}%`);
   add('splash', (a, b) => `${attack === 'cleave' ? 'удар по площі' : 'вибух'} ${signed(b - a)} кл.`);
   add('buff', (a, b) => `зілля ${signed((b - a) * 100, 0)}%`);
+  add('souls', (a, b) => `душі ${a} → ${b}`);
   add('knock', (a, b) => `відкидання ${signed(b - a, 1)} кл.`);
   add('chainRange', (a, b) => `стрибок ${signed(b - a, 1)} кл.`);
   add('minRange', (a, b) => `мертва зона ${signed(b - a)} кл.`);
@@ -351,7 +352,7 @@ function refreshUpgrade() {
   $('upBody').classList.toggle('hidden', !t);
   if (!t) { upKey = null; upTower = null; return; }
 
-  const key = [t.type, t.level, t.boulders, t.buffs.map(b => b.kind + b.v).join()].join(':');
+  const key = [t.type, t.level, t.boulders, t.deaths, t.buffs.map(b => b.kind + b.v).join()].join(':');
   if (t !== upTower || key !== upKey) {
     if (!upTower || upTower.type !== t.type) {
       $('upIcon').textContent = '';
@@ -388,6 +389,9 @@ function refreshUpgrade() {
     } else if (attack === 'buff') {
       stat('Зілля', s => `+${Math.round(s.buff * 100)}%`);
       stat('Кому', s => `${s.targets} випадк. монстр${s.targets === 1 ? 'у' : 'ам'}`);
+    } else if (attack === 'grave') {
+      stat('Душі', s => `+${s.souls} 👻 за ${def.every} смертей`);
+      fixed('Смертей', `${t.deaths} / ${def.every}`);
     } else if (attack === 'manual') {
       stat('Валуни', s => `${Math.min(t.boulders, s.targets)} / ${s.targets}`);
       stat('Відкидання', s => s.knock.toFixed(1) + ' кл.');

@@ -13,7 +13,7 @@ HTML5 Canvas + чистий JavaScript, без збірки і залежнос�
 Код лишився з TD-назвами: `Tower` = монстр, `Enemy` = авантюрист, `money` = душі, `lives` = міцність Серця,
 `wave` = набіг. Монстри: `archer` скелет-лучник, `cannon` вогняний імп, `frost` привид, `spider` павук,
 `golem` голем, `lich` лич, `eye` біхолдер, `slime` слаймо-пулька, `vampire` вампір, `plate` живі лати, `witch` котел відьми,
-`orc` орк-швиряка. Авантюристи: `normal` воїн, `fast` злодій, `tank` паладин, `gnome` гном,
+`orc` орк-швиряка, `grave` кладовище. Авантюристи: `normal` воїн, `fast` злодій, `tank` паладин, `gnome` гном,
 `priest` жрець, `mage` маг, `scout` розвідник, `knight` вершник, `jester` шут, `blade` майстер меча, `hero` герой-бос.
 
 ## Структура
@@ -43,15 +43,15 @@ HTML5 Canvas + чистий JavaScript, без збірки і залежнос�
   кого взагалі може цілити),
   (броня/щит/отрута/лікування/оглушення/невидимість через `hidden`/`revealed`), `Tower` (атаки `projectile`/`aura`/`beam`/`web` — павук раз на `rate` стріляє павутиною в конус `cone` перед собою — усі в ньому стоять `hold` с через `stun(t, webbed)` (кокон замість зірочок, ефект `cone`), без урону; з рівнем ростуть утримання, дальність і частота,
   детектори підсвічують невидимих; біхолдер `fixedDir` б'є смугою `beamWidth` у бік `dir` з `DIRS`, зона дії — `reaches(e)`
-  (з мертвою зоною `minRange`); `haunt` привида, `drain` вампіра (`links` + `drawLinks`), `cleave` лат (ближній удар + фізичний сплеш `splash` навколо цілі), `buff` і `manual` —
-  без власної атаки), `Boulder` (валун орка живе в `game.projectiles`: відкидає назад через `setProgress`, крім `steadfast`),
+  (з мертвою зоною `minRange`); `haunt` привида, `drain` вампіра (`links` + `drawLinks`), `cleave` лат (ближній удар + фізичний сплеш `splash` навколо цілі), `buff`, `manual` і `grave` —
+  без власної атаки; кладовище рахує смерті `deaths`, кожна `every`-та дає `souls` душ — `graveDeath()` у game.js), `Boulder` (валун орка живе в `game.projectiles`: відкидає назад через `setProgress`, крім `steadfast`),
   `Projectile` (сплеш, сповільнення, отрута, ланцюг `jump`),
   малювання: `drawAdventurer` (switch за типом), монстри через мапу `TOWER_DRAW`.
 - `js/game.js` — стан `game` (`mode`, `over`: 'menu'|'win'|'lose', `auto`, `stats` — урон/вбивства за типом монстра), `startWave`
   (скидає бафи й варить нові — `brew()`), `update(dt)` (після набігу орк отримує валун), рекорд, `canAfford` (душі, ліміт,
   `unique`), `throwBoulder`, `newTower` (біхолдер/орк одразу дивляться за `bestDir`);
   малювання: `buildMapLayer()` (кеш), факели, Серце, віньєтка, `drawEffect` (ефекти за `kind`: beam/bolt/quake/кола); цикл `frame`.
-- `js/ui.js` — об'єкт `ui` (placing/selected/hover/tab), події миші й клавіатури (монстри — `TOWER_KEYS` 1…9, 0, -, =;
+- `js/ui.js` — об'єкт `ui` (placing/selected/hover/tab), події миші й клавіатури (монстри — `TOWER_KEYS` 1…9, 0, -, =, [;
   подвійний клік по орку — кидок), `refreshUI()` кожен кадр, `refreshOverlay()` (меню/кінець), старт гри.
   Розкладка: зліва панель набігу (`refreshRaid`) і бестіарій (`refreshBestiary`, за `game.seen` — хто вже з'являвся за цю гру);
   центр — canvas; справа вкладки «Монстри» / «Посилення» (`refreshUpgrade`, «зараз → після» через `towerStats()`).
