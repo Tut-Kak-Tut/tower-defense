@@ -232,7 +232,7 @@ function update(dt) {
   if (game.waveActive && !game.spawnQueue.length && !game.enemies.length) {
     game.waveActive = false;
     game.autoTimer = AUTO_DELAY;
-    game.money += WAVE_BONUS + game.wave * 5;
+    game.money += WAVE_BONUS + game.wave * WAVE_BONUS_PER;
     // орк між набігами обтесує ще один валун
     for (const t of game.towers) {
       if (t.def.attack === 'manual') t.boulders = Math.min(targetsAt(t.def, t.level), t.boulders + 1);

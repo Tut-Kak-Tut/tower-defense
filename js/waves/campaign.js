@@ -42,44 +42,44 @@ new WaveBuilder(2)
   .build();
 
 new WaveBuilder(3)
-  .squad().add('fast', 6, 1)
+  .squad().add('fast', 4, 1)
   .build();
 
 new WaveBuilder(4)
-  .squad().add('normal', 4, 0.8)
-  .squad().add('fast', 5, 0.45)
+  .squad().add('normal', 3, 0.8)
+  .squad().add('fast', 4, 0.45)
   .build();
 
 new WaveBuilder(5)
-  .squad().add('tank', 1, 1.5).add('normal', 3, 0.8)
-  .squad().add('fast', 4, 0.45)
+  .squad().add('tank', 1, 1.5).add('normal', 2, 0.8)
+  .squad().add('fast', 3, 0.45)
   .build();
 
 new WaveBuilder(6)
-  .squad().add('tank', 1, 1.5).add('fast', 4, 0.45)
-  .squad().add('tank', 1, 1.5).add('normal', 4, 0.8).add('fast', 1, 0.45)
+  .squad().add('tank', 1, 1.5).add('fast', 3, 0.45)
+  .squad().add('tank', 1, 1.5).add('normal', 3, 0.8).add('fast', 1, 0.45)
   .build();
 
 new WaveBuilder(7)
-  .squad().add('tank', 1, 1.5).add('normal', 4, 0.8)
-  .squad().add('tank', 1, 1.5).add('normal', 4, 0.8)
-  .squad().add('tank', 1, 1.5).add('normal', 4, 0.8)
+  .squad().add('tank', 1, 1.5).add('normal', 3, 0.8)
+  .squad().add('tank', 1, 1.5).add('normal', 3, 0.8)
+  .squad().add('tank', 1, 1.5).add('normal', 3, 0.8)
   .build();
 
 new WaveBuilder(8)
-  .squad().add('tank', 1, 1.5).add('fast', 10, 0.4, { speed: 1.05 })
-  .squad().add('tank', 1, 1.5).add('fast', 10, 0.4, { speed: 1.05 })
+  .squad().add('tank', 1, 1.5).add('fast', 7, 0.4, { speed: 1.05 })
+  .squad().add('tank', 1, 1.5).add('fast', 7, 0.4, { speed: 1.05 })
   .build();
 
 new WaveBuilder(9)
-  .squad().add('tank', 4, 1.2).add('normal', 10, 0.7)
+  .squad().add('tank', 3, 1.2).add('normal', 7, 0.7)
   .build();
 
 new WaveBuilder(10)
-  .squad().add('normal', 5, 0.8)
+  .squad().add('normal', 4, 0.8)
   .squad().add('tank', 2, 1.2).add('hero', 1, 1)
-  .squad().add('fast', 4, 0.45)
-  .squad().add('normal', 5, 0.8)
+  .squad().add('fast', 3, 0.45)
+  .squad().add('normal', 4, 0.8)
   .build();
 
 new WaveBuilder(11)   // новий: Гном-латник
