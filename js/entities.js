@@ -17,8 +17,13 @@ function towerStats(def, level) {
       hold: def.hold + def.holdLvl * l,
     };
   }
+  const dmgMul = Math.pow(def.dmgLvl || LVL_DMG, l);
   return {
-    damage: def.damage * Math.pow(def.dmgLvl || LVL_DMG, l),
+    damage: def.damage * dmgMul,
+    damageMax: (def.damageMax || 0) * dmgMul,
+    cleave: def.cleave ? def.cleave + def.cleaveLvl * l : 0,
+    buff: def.buff ? def.buff + def.buffLvl * l : 0,
+    knock: def.knock ? def.knock + def.knockLvl * l : 0,
     range: def.range + (def.rangeLvl ?? LVL_RANGE) * l,
     rate: def.rate * Math.pow(def.rateLvl || LVL_RATE, l),
     targets: targetsAt(def, level),
@@ -154,7 +159,8 @@ class Enemy {
     // стрій: наздогнавши попереднього в загоні, не обганяємо його (загиблого пропускаємо)
     while (this.leader && !alive(this.leader)) this.leader = this.leader.leader;
     const lead = this.leader;
-    if (lead && lead.progress - this.progress < FORMATION_GAP) {
+    // (лідер позаду — його відкинуло валуном — не гальмує)
+    if (lead && lead.progress >= this.progress && lead.progress - this.progress < FORMATION_GAP) {
       speed = Math.min(speed, lead.speed);
     }
     let move = speed * dt;
@@ -402,6 +408,8 @@ class Tower {
     this.buffs = [];      // бафи відьми на цей набіг: {kind: 'rate' | 'dmg', v}
     this.angle = -Math.PI / 2;
     if (this.def.fixedDir) this.setDir(3);
+    if (this.def.attack === 'manual') this.boulders = targetsAt(this.def, 1);  // валуни орка
+    if (this.def.attack === 'drain') this.links = new Map();                  // цілі вампіра → секунди висмоктування
   }
 
   setDir(dir) {
@@ -422,7 +430,10 @@ class Tower {
 
   // хто в зоні дії: у колі дальності, а для біхолдера — на лінії його променя
   reaches(e) {
-    if (!this.def.fixedDir) return Math.hypot(e.x - this.x, e.y - this.y) <= this.range + e.radius;
+    if (!this.def.fixedDir) {
+      const d = Math.hypot(e.x - this.x, e.y - this.y);
+      return d <= this.range + e.radius && d >= (this.def.minRange || 0) * CELL;
+    }
     const end = this.beamEnd();
     return this.inBeam(e, end.x, end.y);
   }
@@ -456,7 +467,10 @@ class Tower {
         if (e.stealth && this.reaches(e)) e.revealed = 0.3;
       }
     }
-    if (this.def.attack === 'haunt') { this.haunt(game, this.stats()); return; }
+    const attack = this.def.attack || 'projectile';
+    if (attack === 'buff' || attack === 'manual') return;   // відьма й орк самі не атакують
+    if (attack === 'haunt') { this.haunt(game, this.stats()); return; }
+    if (attack === 'drain') { this.drain(game, dt, this.stats()); return; }
     this.cooldown -= dt;
     if (this.cooldown > 0) return;
     let target = null;
@@ -468,8 +482,8 @@ class Tower {
     if (!target) return;
     if (!this.def.fixedDir) this.angle = Math.atan2(target.y - this.y, target.x - this.x);
     const s = this.stats();
-    const attack = this.def.attack || 'projectile';
     if (attack === 'aura') this.stomp(game, s);
+    else if (attack === 'cleave') this.cleave(game, s, target);
     else if (attack === 'beam') this.beam(game, s);
     else if (attack === 'web') this.web(game, s);
     else game.projectiles.push(new Projectile(this, target));
@@ -484,6 +498,53 @@ class Tower {
       e.makeFrail(s.frail, 0.2);
       if (e.stealth) e.slow(s.slow, 0.3);
     }
+  }
+
+  // вампір: тримає до targets цілей; на кожній урон росте, поки її не відпустить
+  drain(game, dt, s) {
+    for (const e of this.links.keys()) {
+      if (!this.canHit(e) || !this.reaches(e)) this.links.delete(e);
+    }
+    if (this.links.size < s.targets) {
+      const free = game.enemies.filter(e => !this.links.has(e) && this.canHit(e) && this.reaches(e))
+        .sort((a, b) => b.progress - a.progress);
+      for (const e of free.slice(0, s.targets - this.links.size)) this.links.set(e, 0);
+    }
+    this.rampTime = this.def.ramp * s.rate;
+    for (const [e, held] of this.links) {
+      const k = Math.min(1, held / this.rampTime);
+      e.hit((s.damage + (s.damageMax - s.damage) * k) * dt, false, this.type);
+      this.links.set(e, held + dt);
+      this.angle = Math.atan2(e.y - this.y, e.x - this.x);
+    }
+  }
+
+  // червоні нитки крові до цілей вампіра — товщають, поки урон розганяється
+  drawLinks(ctx) {
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    for (const [e, held] of this.links) {
+      const k = Math.min(1, held / this.rampTime);
+      const mx = (this.x + e.x) / 2 + Math.sin(time * 7 + e.progress) * 5, my = (this.y + e.y) / 2 + Math.cos(time * 6) * 5;
+      ctx.strokeStyle = `rgba(220, 30, 60, ${0.35 + k * 0.45})`;
+      ctx.lineWidth = 1 + k * 2.5;
+      ctx.beginPath();
+      ctx.moveTo(this.x, this.y - 6);
+      ctx.quadraticCurveTo(mx, my, e.x, e.y);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  // живі лати: удар по цілі, і легких, що йдуть впритул до неї, зачіпає тим самим замахом
+  cleave(game, s, target) {
+    const rad = s.cleave * CELL;
+    target.hit(s.damage, false, this.type);
+    for (const e of game.enemies) {
+      if (e === target || !e.def.light || !this.canHit(e)) continue;
+      if (Math.hypot(e.x - target.x, e.y - target.y) <= rad + e.radius) e.hit(s.damage, false, this.type);
+    }
+    game.effects.push({ kind: 'slash', x: target.x, y: target.y, a: this.angle, r: rad, t: 0.25, max: 0.25, color: '#dfe6f2' });
   }
 
   // голем: удар по землі по всіх у радіусі (і невидимих теж — земля трясеться під усіма)
@@ -537,6 +598,15 @@ class Tower {
     ctx.lineWidth = 1.5;
     ctx.stroke();
 
+    // зілля відьми — кольорові кола під монстром: помаранчеве = швидкість атаки, червоне = урон
+    this.buffs.forEach((b, i) => {
+      ctx.beginPath();
+      ctx.ellipse(x, y + 12, 18 + i * 3, 7.5 + i * 1.5, 0, 0, Math.PI * 2);
+      ctx.strokeStyle = b.kind === 'rate' ? 'rgba(255, 170, 50, 0.85)' : 'rgba(255, 60, 70, 0.85)';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    });
+
     if (this.def.attack === 'haunt') {
       // холодний туман привида на всю зону дії, ледь дихає
       const rad = this.range;
@@ -552,6 +622,7 @@ class Tower {
     ctx.save();
     ctx.translate(x, y);
     TOWER_DRAW[this.type](ctx, this.angle);
+    if (this.def.attack === 'manual') drawCarriedBoulders(ctx, this.boulders);
     ctx.restore();
 
     // рівень — руни, що світяться: до 5 фіолетових, далі вони по одній стають золотими
@@ -1128,11 +1199,309 @@ function drawBeholder(ctx, angle) {
   ctx.restore();
 }
 
+function drawSlime(ctx, angle) {
+  // дерев'яна рама катапульти
+  ctx.fillStyle = '#5a3f26';
+  ctx.strokeStyle = 'rgba(0,0,0,0.5)';
+  ctx.lineWidth = 1.2;
+  ctx.fillRect(-12, 4, 24, 5);
+  ctx.strokeRect(-12, 4, 24, 5);
+  ctx.fillStyle = '#3a2818';
+  for (const wx of [-9, 9]) { ctx.beginPath(); ctx.arc(wx, 10, 3.5, 0, Math.PI * 2); ctx.fill(); }
+  // важіль із ковшем, повернутий до цілі
+  ctx.save();
+  ctx.rotate(angle);
+  ctx.strokeStyle = '#7a5a36';
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(-8, 0); ctx.lineTo(10, 0);
+  ctx.stroke();
+  ctx.fillStyle = '#4a3420';
+  ctx.beginPath();
+  ctx.arc(-9, 0, 4.5, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+  // живий слиз-стрілець поверх рами — тремтить і пускає бульбашки
+  const wob = Math.sin(time * 4) * 0.8;
+  const grad = ctx.createRadialGradient(-3, -6, 1, 0, -2, 11);
+  grad.addColorStop(0, '#d8ffb0');
+  grad.addColorStop(1, '#3f9a2a');
+  ctx.fillStyle = grad;
+  ctx.beginPath();
+  ctx.moveTo(-10, 4);
+  ctx.quadraticCurveTo(-11 - wob, -10, 0, -11 + wob);
+  ctx.quadraticCurveTo(11 + wob, -10, 10, 4);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = '#1a2a10';
+  ctx.beginPath();
+  ctx.arc(-3.5, -4, 1.6, 0, Math.PI * 2);
+  ctx.arc(3.5, -4, 1.6, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = 'rgba(230,255,200,0.6)';
+  const ph = (time * 0.8) % 1;
+  ctx.beginPath();
+  ctx.arc(4 - ph * 2, -8 - ph * 6, 1.3 * (1 - ph) + 0.3, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+function drawVampire(ctx, angle) {
+  // плащ з червоною підкладкою, що ледь майорить
+  const flap = Math.sin(time * 3) * 1.5;
+  ctx.fillStyle = '#12080c';
+  ctx.beginPath();
+  ctx.moveTo(-5, -6); ctx.lineTo(-15 - flap, 12); ctx.lineTo(0, 9); ctx.lineTo(15 + flap, 12); ctx.lineTo(5, -6);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = '#8a1024';
+  ctx.beginPath();
+  ctx.moveTo(-4, -4); ctx.lineTo(-10 - flap, 10); ctx.lineTo(0, 7); ctx.lineTo(10 + flap, 10); ctx.lineTo(4, -4);
+  ctx.closePath();
+  ctx.fill();
+  // високий комір
+  ctx.fillStyle = '#12080c';
+  ctx.beginPath();
+  ctx.moveTo(-8, -3); ctx.lineTo(-9, -13); ctx.lineTo(-3, -6); ctx.lineTo(3, -6); ctx.lineTo(9, -13); ctx.lineTo(8, -3);
+  ctx.closePath();
+  ctx.fill();
+  // бліде обличчя з очима, що дивляться на жертву
+  ctx.beginPath();
+  ctx.ellipse(0, -8, 5.5, 6.5, 0, 0, Math.PI * 2);
+  ctx.fillStyle = '#e8dde0';
+  ctx.fill();
+  ctx.fillStyle = '#1a0a10';                        // зачесане волосся мисом
+  ctx.beginPath();
+  ctx.moveTo(-5.5, -10); ctx.quadraticCurveTo(0, -17, 5.5, -10); ctx.lineTo(0, -11.5);
+  ctx.closePath();
+  ctx.fill();
+  const ex = Math.cos(angle) * 0.8, ey = Math.sin(angle) * 0.8;
+  ctx.save();
+  ctx.shadowColor = '#ff2040';
+  ctx.shadowBlur = 6;
+  ctx.fillStyle = '#ff2848';
+  ctx.fillRect(-3 + ex - 0.8, -8.5 + ey - 0.8, 1.8, 1.6);
+  ctx.fillRect(2 + ex - 0.8, -8.5 + ey - 0.8, 1.8, 1.6);
+  ctx.restore();
+  ctx.fillStyle = '#ffffff';                        // ікла
+  ctx.beginPath();
+  ctx.moveTo(-1.8, -4.5); ctx.lineTo(-1.2, -2.6); ctx.lineTo(-0.6, -4.5);
+  ctx.moveTo(0.6, -4.5); ctx.lineTo(1.2, -2.6); ctx.lineTo(1.8, -4.5);
+  ctx.fill();
+}
+
+function drawPlate(ctx, angle) {
+  const sway = Math.sin(time * 2.2) * 0.8;
+  // меч у бік цілі
+  ctx.save();
+  ctx.rotate(angle);
+  ctx.fillStyle = '#dfe6f2';
+  ctx.fillRect(6, -1.5, 15, 3);
+  ctx.fillStyle = '#6b4a2b';
+  ctx.fillRect(3, -4, 3, 8);
+  ctx.restore();
+  // нагрудник з наплічниками
+  ctx.fillStyle = '#6c7688';
+  ctx.strokeStyle = 'rgba(0,0,0,0.55)';
+  ctx.lineWidth = 1.3;
+  for (const sx of [-1, 1]) {
+    ctx.beginPath();
+    ctx.ellipse(sx * 10, -2 + sway * sx * 0.3, 5, 4, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+  }
+  ctx.fillStyle = TOWERS.plate.color;
+  ctx.beginPath();
+  ctx.moveTo(-8, -5); ctx.lineTo(8, -5); ctx.lineTo(7, 7); ctx.lineTo(0, 11); ctx.lineTo(-7, 7);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+  ctx.beginPath();
+  ctx.moveTo(0, -4); ctx.lineTo(0, 9);
+  ctx.stroke();
+  // шолом — усередині порожнеча, лише два вогники
+  ctx.fillStyle = '#7e889a';
+  ctx.beginPath();
+  ctx.arc(0, -10 + sway * 0.3, 6, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(0,0,0,0.55)';
+  ctx.stroke();
+  ctx.fillStyle = '#0a0a10';
+  ctx.fillRect(-4, -11 + sway * 0.3, 8, 2.5);
+  ctx.save();
+  ctx.shadowColor = '#7fd4ff';
+  ctx.shadowBlur = 6;
+  ctx.fillStyle = '#9fe4ff';
+  ctx.fillRect(-3, -10.5 + sway * 0.3, 1.5, 1.5);
+  ctx.fillRect(1.5, -10.5 + sway * 0.3, 1.5, 1.5);
+  ctx.restore();
+}
+
+function drawWitch(ctx, angle) {
+  // капелюх відьми, що визирає з-за котла
+  ctx.fillStyle = '#2a1a3a';
+  ctx.beginPath();
+  ctx.ellipse(-4, -9, 9, 2.5, -0.2, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(-9, -10); ctx.quadraticCurveTo(-5, -20, 2, -24); ctx.lineTo(0, -10);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = '#c9a227';
+  ctx.fillRect(-8, -12, 8, 1.8);
+  // котел на ніжках
+  ctx.fillStyle = '#16141a';
+  ctx.beginPath();
+  ctx.moveTo(-12, -2); ctx.quadraticCurveTo(-13, 12, 0, 12); ctx.quadraticCurveTo(13, 12, 12, -2);
+  ctx.closePath();
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+  ctx.fillStyle = '#16141a';
+  ctx.fillRect(-9, 10, 2.5, 4);
+  ctx.fillRect(6.5, 10, 2.5, 4);
+  // зілля, що булькає
+  ctx.save();
+  ctx.shadowColor = TOWERS.witch.color;
+  ctx.shadowBlur = 10;
+  ctx.fillStyle = TOWERS.witch.color;
+  ctx.beginPath();
+  ctx.ellipse(0, -2, 11.5, 3.5, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+  ctx.fillStyle = '#d8ffb0';
+  for (let i = 0; i < 3; i++) {
+    const ph = (time * 0.9 + i / 3) % 1;
+    ctx.beginPath();
+    ctx.arc(-6 + i * 6, -3 - ph * 9, 1.8 * (1 - ph) + 0.4, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+function drawOrc(ctx, angle) {
+  const d = Math.cos(angle), e = Math.sin(angle);
+  // руки вбоки, одна трохи в бік кидка
+  ctx.fillStyle = '#5a7f30';
+  ctx.strokeStyle = 'rgba(0,0,0,0.5)';
+  ctx.lineWidth = 1.3;
+  for (const s of [-1, 1]) {
+    ctx.beginPath();
+    ctx.ellipse(s * 12 + d * 2, 1 + e * 2, 4, 5, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+  }
+  // кремезний тулуб у шкурі
+  ctx.fillStyle = TOWERS.orc.color;
+  ctx.beginPath();
+  ctx.ellipse(0, 2, 10, 10, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = '#6b4a2b';
+  ctx.beginPath();
+  ctx.moveTo(-9, 4); ctx.lineTo(9, 1); ctx.lineTo(8, 7); ctx.lineTo(-8, 10);
+  ctx.closePath();
+  ctx.fill();
+  // голова з іклами
+  ctx.fillStyle = '#7fae48';
+  ctx.beginPath();
+  ctx.arc(0, -9, 6.5, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = '#ffcf3f';
+  ctx.fillRect(-3.5, -10.5, 2, 1.6);
+  ctx.fillRect(1.5, -10.5, 2, 1.6);
+  ctx.fillStyle = '#f2ead8';
+  ctx.beginPath();
+  ctx.moveTo(-3, -6); ctx.lineTo(-2.3, -9); ctx.lineTo(-1.5, -6);
+  ctx.moveTo(1.5, -6); ctx.lineTo(2.3, -9); ctx.lineTo(3, -6);
+  ctx.fill();
+}
+
+// валуни за спиною орка — стільки, скільки зараз зарядів
+function drawCarriedBoulders(ctx, n) {
+  for (let i = 0; i < n; i++) {
+    const bx = (i - (n - 1) / 2) * 8, by = 11 + (i % 2) * 2;
+    ctx.beginPath();
+    ctx.arc(bx, by, 4.5, 0, Math.PI * 2);
+    ctx.fillStyle = '#8a8076';
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(0,0,0,0.6)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+  }
+}
+
 // Малюнок монстра за ключем — і на полі, і в іконках.
 const TOWER_DRAW = {
   archer: drawSkeleton, cannon: drawImp, frost: drawGhost,
   spider: drawSpider, golem: drawGolem, lich: drawLich, eye: drawBeholder,
+  slime: drawSlime, vampire: drawVampire, plate: drawPlate, witch: drawWitch, orc: drawOrc,
 };
+
+// Валун орка: котиться смугою в бік tower.dir, відкидає кожного зачепленого назад по коридору
+// (крім steadfast), у кінці вибухає — урон усім зачепленим і всім у колі вибуху.
+class Boulder {
+  constructor(tower) {
+    const s = tower.stats(), d = DIRS[tower.dir];
+    this.x = tower.x;
+    this.y = tower.y;
+    this.dx = d.dx;
+    this.dy = d.dy;
+    this.left = s.range * CELL;       // скільки ще котитися
+    this.speed = 250;
+    this.damage = s.damage;
+    this.knock = s.knock * CELL;
+    this.reach = (tower.def.beamWidth || 0) * CELL;
+    this.src = tower.type;
+    this.struck = new Set();
+    this.spin = 0;
+    this.done = false;
+  }
+
+  update(dt, game) {
+    const step = Math.min(this.left, this.speed * dt);
+    this.x += this.dx * step;
+    this.y += this.dy * step;
+    this.left -= step;
+    this.spin += step / 9;
+    for (const e of game.enemies) {
+      if (!alive(e) || this.struck.has(e) || Math.hypot(e.x - this.x, e.y - this.y) > this.reach + e.radius) continue;
+      this.struck.add(e);
+      if (!e.def.steadfast) {
+        e.setProgress(e.progress - this.knock);
+        e.stun(0.3);
+      }
+    }
+    if (this.left > 0) return;
+    const rad = CELL;
+    for (const e of game.enemies) {
+      if (alive(e) && (this.struck.has(e) || Math.hypot(e.x - this.x, e.y - this.y) <= rad + e.radius)) {
+        e.hit(this.damage, false, this.src);
+      }
+    }
+    game.effects.push({ kind: 'quake', x: this.x, y: this.y, r: rad, t: 0.4, max: 0.4, color: '#b0a090' });
+    this.done = true;
+  }
+
+  draw(ctx) {
+    ctx.save();
+    ctx.translate(this.x, this.y);
+    ctx.rotate(this.spin);
+    ctx.beginPath();
+    ctx.arc(0, 0, 9, 0, Math.PI * 2);
+    ctx.fillStyle = '#8a8076';
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(0,0,0,0.6)';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    ctx.beginPath();                                // тріщини, що крутяться разом із каменем
+    ctx.moveTo(-5, -3); ctx.lineTo(0, 0); ctx.lineTo(3, 6);
+    ctx.moveTo(0, 0); ctx.lineTo(6, -4);
+    ctx.stroke();
+    ctx.restore();
+  }
+}
 
 class Projectile {
   constructor(tower, target) {
@@ -1157,6 +1526,9 @@ class Projectile {
     this.kind = tower.type;
     this.src = tower.type;
     this.angle = tower.angle;
+    this.lob = !!def.lob;             // грудка слизу летить дугою
+    this.dist0 = Math.hypot(target.x - tower.x, target.y - tower.y) || 1;
+    this.flown = 0;
     this.done = false;
   }
 
@@ -1176,6 +1548,7 @@ class Projectile {
     } else {
       this.x += dx / d * step;
       this.y += dy / d * step;
+      this.flown += step;
       this.angle = Math.atan2(dy, dx);
     }
   }
@@ -1230,7 +1603,21 @@ class Projectile {
   draw(ctx) {
     ctx.save();
     ctx.translate(this.x, this.y);
-    if (this.kind === 'archer') {
+    if (this.lob) {
+      // тінь на землі й грудка слизу над нею — висота за дугою польоту
+      const k = Math.min(1, this.flown / Math.max(this.dist0, this.flown + 1));
+      const h = Math.sin(Math.PI * k) * this.dist0 * 0.25;
+      ctx.beginPath();
+      ctx.ellipse(0, 3, 5, 2, 0, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(0,0,0,0.35)';
+      ctx.fill();
+      ctx.beginPath();
+      ctx.ellipse(0, -h, 6, 5 + Math.sin(time * 20) * 0.6, 0, 0, Math.PI * 2);
+      ctx.fillStyle = this.color;
+      ctx.fill();
+      ctx.fillStyle = 'rgba(230,255,200,0.7)';
+      ctx.fillRect(-3, -h - 3, 2, 2);
+    } else if (this.kind === 'archer') {
       // стріла: древко + наконечник + оперення
       ctx.rotate(this.angle);
       ctx.strokeStyle = '#c8b58e';

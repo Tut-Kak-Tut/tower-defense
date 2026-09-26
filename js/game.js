@@ -80,12 +80,40 @@ function canPlace(col, row) {
   return inBounds(col, row) && !PATH_CELLS.has(col + ',' + row) && !towerAt(col, row);
 }
 
+// Чи можна зараз поселити монстра цього типу (душі, ліміт підземелля, єдиний орк).
+function canAfford(type) {
+  const def = TOWERS[type];
+  return game.money >= def.cost && game.towers.length < MAX_TOWERS
+    && !(def.unique && game.towers.some(t => t.type === type));
+}
+
 function placeTower(type, col, row) {
-  const cost = TOWERS[type].cost;
-  if (!canPlace(col, row) || game.money < cost || game.towers.length >= MAX_TOWERS) return false;
-  game.money -= cost;
-  game.towers.push(newTower(type, col, row));
+  if (!canPlace(col, row) || !canAfford(type)) return false;
+  game.money -= TOWERS[type].cost;
+  const t = newTower(type, col, row);
+  game.towers.push(t);
   if (!game.stats[type]) game.stats[type] = { round: 0, total: 0, kills: 0 };
+  if (t.def.attack === 'buff' && game.waveActive) brew(t);   // відьма, поселена під час набігу, варить одразу
+  return true;
+}
+
+// Зілля відьми: двом випадковим монстрам, що б'ють, — одному частота атаки, другому урон.
+const BREWABLE = t => !['web', 'haunt', 'buff', 'manual'].includes(t.def.attack);
+function brew(witch) {
+  const pool = game.towers.filter(BREWABLE);
+  const v = towerStats(witch.def, witch.level).buff;
+  for (const kind of ['rate', 'dmg']) {
+    if (!pool.length) return;
+    const t = pool.splice(Math.floor(Math.random() * pool.length), 1)[0];
+    t.buffs.push({ kind, v, from: witch });
+  }
+}
+
+// Орк кидає валун — лише під час набігу і якщо є заряд.
+function throwBoulder(t) {
+  if (!game.waveActive || game.over || t.boulders <= 0) return false;
+  t.boulders--;
+  game.projectiles.push(new Boulder(t));
   return true;
 }
 
@@ -124,12 +152,15 @@ function upgradeTower(tower) {
   game.money -= cost;
   tower.spent += cost;
   tower.level++;
+  // орк на 5-му і 10-му рівні одразу отримує ще один валун
+  if (tower.def.attack === 'manual') tower.boulders += targetsAt(tower.def, tower.level) - targetsAt(tower.def, tower.level - 1);
   return true;
 }
 
 function sellTower(tower) {
   game.money += tower.sellValue;
   game.towers = game.towers.filter(t => t !== tower);
+  for (const t of game.towers) t.buffs = t.buffs.filter(b => b.from !== tower);   // зілля вигнаної відьми вивітрюється
 }
 
 function startWave() {
@@ -148,6 +179,8 @@ function startWave() {
     }
   });
   game.lastInSquad = [];
+  for (const t of game.towers) t.buffs = [];
+  for (const t of game.towers) if (t.def.attack === 'buff') brew(t);
   game.spawnTimer = game.spawnQueue[0].delay;
   game.waveActive = true;
 }
@@ -200,6 +233,10 @@ function update(dt) {
     game.waveActive = false;
     game.autoTimer = AUTO_DELAY;
     game.money += WAVE_BONUS + game.wave * 5;
+    // орк між набігами обтесує ще один валун
+    for (const t of game.towers) {
+      if (t.def.attack === 'manual') t.boulders = Math.min(targetsAt(t.def, t.level), t.boulders + 1);
+    }
     if (game.mode === 'endless') saveBest(game.wave);
     if (game.wave >= maxWaves()) game.over = 'win';
   }
@@ -403,9 +440,11 @@ function drawVignette() {
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 }
 
-function drawRange(x, y, range, ok) {
+// Зона дії; minRange — мертва зона під монстром (кл.), лишається незафарбованою.
+function drawRange(x, y, range, ok, minRange = 0) {
   ctx.beginPath();
   ctx.arc(x, y, range, 0, Math.PI * 2);
+  if (minRange) ctx.arc(x, y, minRange * CELL, 0, Math.PI * 2, true);
   ctx.fillStyle = ok ? 'rgba(255,255,255,0.12)' : 'rgba(239,71,111,0.12)';
   ctx.fill();
   ctx.strokeStyle = ok ? 'rgba(255,255,255,0.6)' : 'rgba(239,71,111,0.7)';
@@ -513,6 +552,16 @@ function drawEffect(fx) {
       ctx.lineTo(fx.x + Math.cos(a) * r2, fx.y + Math.sin(a) * r2);
     }
     ctx.stroke();
+  } else if (fx.kind === 'slash') {
+    // замах живих лат: світла дуга поперек цілі
+    ctx.strokeStyle = fx.color;
+    ctx.globalAlpha = k;
+    ctx.lineWidth = 3 * k + 1;
+    ctx.lineCap = 'round';
+    const sweep = (1 - k) * 1.6;
+    ctx.beginPath();
+    ctx.arc(fx.x, fx.y, Math.max(12, fx.r), fx.a - 1.3 + sweep, fx.a - 0.2 + sweep);
+    ctx.stroke();
   } else if (fx.kind === 'quake') {
     // удар голема: кільце, що розходиться по землі
     ctx.strokeStyle = fx.color;
@@ -539,24 +588,26 @@ function draw() {
   // привид вежі під курсором
   if (ui.placing && ui.hover && inBounds(ui.hover.col, ui.hover.row)) {
     const { col, row } = ui.hover;
-    const ok = canPlace(col, row) && game.money >= TOWERS[ui.placing].cost && game.towers.length < MAX_TOWERS;
+    const ok = canPlace(col, row) && canAfford(ui.placing);
     ctx.fillStyle = ok ? 'rgba(150,95,220,0.35)' : 'rgba(239,71,111,0.4)';
     ctx.fillRect(col * CELL, row * CELL, CELL, CELL);
     const ghost = newTower(ui.placing, col, row);
     if (ghost.def.fixedDir) drawBeamLine(ghost, ok);
-    else drawRange(ghost.x, ghost.y, ghost.range, ok);
+    else if (ghost.range) drawRange(ghost.x, ghost.y, ghost.range, ok, ghost.def.minRange);
     ctx.globalAlpha = 0.55;
     ghost.draw(ctx);
     ctx.globalAlpha = 1;
   }
 
   if (ui.selected) {
-    if (ui.selected.def.fixedDir) drawBeamLine(ui.selected, true);
-    else drawRange(ui.selected.x, ui.selected.y, ui.selected.range, true);
+    const t = ui.selected;
+    if (t.def.fixedDir) drawBeamLine(t, true);
+    else if (t.range) drawRange(t.x, t.y, t.range, true, t.def.minRange);
   }
 
   for (const t of game.towers) t.draw(ctx);
   for (const e of game.enemies) e.draw(ctx);
+  for (const t of game.towers) if (t.links) t.drawLinks(ctx);
   for (const p of game.projectiles) p.draw(ctx);
   for (const fx of game.effects) drawEffect(fx);
 

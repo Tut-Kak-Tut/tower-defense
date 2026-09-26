@@ -120,10 +120,18 @@ canvas.addEventListener('click', e => {
     selectTower(t);
   } else if (ui.placing) {
     // вежа лишається вибраною — можна ставити кілька підряд
-    if (placeTower(ui.placing, col, row) && game.money < TOWERS[ui.placing].cost) ui.placing = null;
+    if (placeTower(ui.placing, col, row) && !canAfford(ui.placing)) ui.placing = null;
   } else {
     ui.selected = null;
   }
+});
+
+// орк: подвійний клік кидає валун (перший клік уже вибрав його)
+canvas.addEventListener('dblclick', e => {
+  if (game.over) return;
+  const { col, row } = cellFromEvent(e);
+  const t = towerAt(col, row);
+  if (t && t.def.attack === 'manual') throwBoulder(t);
 });
 
 // ---------- кнопки керування ----------
@@ -294,7 +302,7 @@ function refreshUpgrade() {
   $('upBody').classList.toggle('hidden', !t);
   if (!t) { upKey = null; upTower = null; return; }
 
-  const key = t.type + ':' + t.level;
+  const key = [t.type, t.level, t.boulders, t.buffs.map(b => b.kind + b.v).join()].join(':');
   if (t !== upTower || key !== upKey) {
     if (!upTower || upTower.type !== t.type) {
       $('upIcon').textContent = '';
@@ -314,6 +322,9 @@ function refreshUpgrade() {
     const grows = {
       web: 'павутина тримає довше, летить далі, постріли частіші',
       haunt: 'туман ширший, крихкість сильніша, невидимі мерзнуть дужче',
+      drain: `урон +${Math.round((def.dmgLvl - 1) * 100)}%, розгін швидший, ще ціль на ${def.targetLvls.join('/')} рівнях`,
+      buff: `зілля сильніше на ${Math.round(def.buffLvl * 100)}%`,
+      manual: `валун відкидає далі, ще валун на ${def.targetLvls.join(' і ')} рівнях`,
     }[attack] || [
       def.dmgLvl !== 1 && `урон +${Math.round(((def.dmgLvl || LVL_DMG) - 1) * 100)}%`,
       `дальність +${+(def.rangeLvl ?? LVL_RANGE).toFixed(2)} кл.`,
@@ -331,6 +342,19 @@ function refreshUpgrade() {
       stat('Дальність', range);
       stat('Перезарядка', s => s.rate.toFixed(2) + 'с');
       fixed('Конус', def.cone + '°');
+    } else if (attack === 'drain') {
+      stat('Урон/с', s => `${Math.round(s.damage)} → ${Math.round(s.damageMax)}`);
+      stat('Розгін', s => (def.ramp * s.rate).toFixed(1) + 'с');
+      stat('Цілей', s => s.targets);
+      stat('Дальність', range);
+    } else if (attack === 'buff') {
+      stat('Зілля', s => `+${Math.round(s.buff * 100)}%`);
+      fixed('Кому', '2 випадкові монстри');
+    } else if (attack === 'manual') {
+      stat('Валуни', s => `${Math.min(t.boulders, s.targets)} / ${s.targets}`);
+      stat('Відкидання', s => s.knock.toFixed(1) + ' кл.');
+      fixed('Вибух', `${def.damage} урону`);
+      fixed('Кидок', def.range + ' кл.');
     } else if (attack === 'haunt') {
       stat('Крихкість', s => `+${Math.round(s.frail * 100)}% урону`);
       stat('Туман', range);
@@ -340,6 +364,8 @@ function refreshUpgrade() {
       stat('Дальність', range);
       stat('Атака', s => s.rate.toFixed(2) + 'с');
       if (def.splash) fixed('Вибух', def.splash + ' кл.');
+      if (def.minRange) fixed('Мертва зона', `ближче ${def.minRange} кл.`);
+      if (def.cleave) stat('Зачіпає легких', s => `у ${s.cleave.toFixed(2)} кл.`);
       if (def.slow) stat('Сповільнення', s => `${Math.round((1 - s.slow) * 100)}% · ${def.slowTime}с`);
       if (def.frail) stat('Крихкість', s => `+${Math.round(s.frail * 100)}% урону`);
       if (def.poison) stat('Отрута', s => `${Math.round(s.poison)}/с · ${def.poisonTime}с`);
@@ -348,6 +374,7 @@ function refreshUpgrade() {
       if (attack === 'beam') fixed('Промінь', def.fixedDir ? 'смуга' : 'крізь усіх');
     }
     if (def.magic) fixed('Магія', 'маг не відчуває');
+    for (const b of t.buffs) fixed(b.kind === 'rate' ? 'Зілля швидкості' : 'Зілля сили', `+${Math.round(b.v * 100)}%`);
     if (def.detect) fixed('Підсвічує невидимих', 'так');
 
     $('upStats').innerHTML = rows.map(([label, a, b]) => {
@@ -419,7 +446,7 @@ function refreshUI() {
 
   for (const [type, btn] of Object.entries(towerButtons)) {
     btn.classList.toggle('active', ui.placing === type);
-    btn.classList.toggle('poor', full || game.money < TOWERS[type].cost);
+    btn.classList.toggle('poor', !canAfford(type));
   }
 
   refreshRaid();
