@@ -41,6 +41,9 @@ function shieldGuards(e) {
     && Math.hypot(g.x - e.x, g.y - e.y) <= g.def.shieldAura * CELL);
 }
 
+// Павутина не тримає: сам несприйнятливий (webImmune) або стоїть під цілим щитом паладина.
+const webProof = e => e.def.webImmune || shieldGuards(e).length > 0;
+
 // Сторони світу для променя біхолдера: індекс = tower.dir, кут = dir * π/2.
 const DIRS = [
   { dx: 1, dy: 0, name: L('праворуч', 'вправо') }, { dx: 0, dy: 1, name: L('вниз', 'вниз') },
@@ -115,6 +118,18 @@ class Enemy {
     return this.stunTimer > 0 ? 0 : this.baseSpeed * this.slowFactor * (this.hasted > 0 ? this.hasteMul : 1);
   }
 
+  // носій прапора стоїть, поки під стягом лише носії, а хтось інший ще живий чи тільки з'явиться
+  waitsEscort(game) {
+    const rad = this.def.haste.radius * CELL;
+    let others = game.spawnQueue.some(s => !ENEMIES[s.type].haste);
+    for (const e of game.enemies) {
+      if (e.def.haste || !alive(e)) continue;
+      if (Math.hypot(e.x - this.x, e.y - this.y) <= rad) return false;
+      others = true;
+    }
+    return others;
+  }
+
   update(dt, game) {
     if (this.revealed > 0) this.revealed -= dt;
     if (this.hasted > 0) this.hasted -= dt;
@@ -155,7 +170,10 @@ class Enemy {
         game.effects.push({ kind: 'heal', x: this.x, y: this.y, r: rad, t: 0.5, max: 0.5, color: '#9dffb0' });
       }
     }
+    // цілий щит паладина поруч знімає павутину
+    if (this.stunTimer > 0 && this.webbed && webProof(this)) { this.stunTimer = 0; this.webbed = false; }
     if (this.stunTimer > 0) { this.stunTimer -= dt; return; }
+    if (this.def.haste && this.waitsEscort(game)) return;
     let speed = this.speed;
     // стрій: наздогнавши попереднього в загоні, не обганяємо його (загиблого пропускаємо)
     while (this.leader && !alive(this.leader)) this.leader = this.leader.leader;
@@ -504,7 +522,7 @@ class Tower {
 
   // Чи може цей монстр атакувати авантюриста: невидимих — лише з detect.
   canHit(e) {
-    return alive(e) && (!e.hidden || this.def.detect);
+    return alive(e) && (!e.hidden || this.def.detect) && !(this.def.attack === 'web' && webProof(e));
   }
 
   get damage() { return this.stats().damage; }
@@ -621,7 +639,7 @@ class Tower {
   web(game, s) {
     const len = s.range * CELL, half = this.def.cone * Math.PI / 360;
     for (const e of game.enemies) {
-      if (!alive(e)) continue;
+      if (!alive(e) || webProof(e)) continue;
       const dx = e.x - this.x, dy = e.y - this.y, d = Math.hypot(dx, dy);
       if (d > len + e.radius) continue;
       // кут до цілі з поправкою на її розмір, щоб край конуса чіпляв і тих, хто лише зачепився

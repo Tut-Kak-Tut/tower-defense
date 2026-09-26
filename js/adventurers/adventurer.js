@@ -72,6 +72,7 @@ class AdventurerBuilder {
   setSlowImmune(on = true) { return this.set('slowImmune', on); }   // холод привида не діє
   setPhysicalArmor(on = true) { return this.set('physArmor', on); } // броня тримає лише фізичні удари, магія (monster.magic) — крізь неї
   setSteadfast(on = true) { return this.set('steadfast', on); }     // валун орка не відкидає
+  setWebImmune(on = true) { return this.set('webImmune', on); }     // павутина павука не тримає
   setUndying(on = true) { return this.set('undying', on); }         // не гине (лишається 1 HP), поки на полі є союзник без setUndying
   setDeflect(chance) { return this.set('deflect', chance); }        // шанс відбити снаряд (промені й аури — ні)
   setStealth(on = true) { return this.set('stealth', on); }         // невидимий: б'ють лише монстри з detect
