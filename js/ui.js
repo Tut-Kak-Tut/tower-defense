@@ -260,6 +260,9 @@ function enemyTraits(def) {
   if (def.lastStand) t.push('переживає смертельний удар');
   if (def.magicImmune) t.push('не відчуває магії');
   if (def.spawn) t.push(`гинучи, лишає: ${ENEMIES[def.spawn].name.toLowerCase()}`);
+  if (def.split) t.push(`ділиться ${def.split} рази`);
+  if (def.deflect) t.push(`відбиває ${Math.round(def.deflect * 100)}% снарядів`);
+  if (def.light) t.push('легкий обладунок');
   if (def.heal) t.push('лікує');
   if (def.stealth) t.push('невидимий');
   if (def.lifeDmg) t.push(`Серцю −${def.lifeDmg}`);
@@ -272,7 +275,9 @@ function refreshBestiary() {
     const def = ENEMIES[type];
     r.row.classList.toggle('locked', !known);
     r.name.textContent = known ? def.name : '???';
-    r.count.textContent = known ? `👻 ${def.reward}` : '';
+    // шут дає душі лише за найменших — показуємо суму за всю родину
+    const reward = def.split ? def.splitReward * 2 ** def.split : def.reward;
+    r.count.textContent = known ? `👻 ${reward}` : '';
     r.sub.textContent = known
       ? `${def.desc}. Здоров'я ${def.hp}, швидкість ${def.speed}${enemyTraits(def)}`
       : 'Ще не зустрічався в підземеллі';

@@ -92,6 +92,7 @@ class Enemy {
     this.hasteMul = 1;
     this.lastStand = !!def.lastStand; // гном ще не використав «друге життя»
     this.summoned = false; // з'явився з іншого авантюриста, а не з черги набігу
+    this.gen = 0;          // покоління шута: 0 — цілий, def.split — найменші
     this.poisonDps = 0;
     this.poisonTimer = 0;
     this.poisonSrc = null; // чия отрута — для статистики
@@ -201,6 +202,17 @@ class Enemy {
       return e;
     };
     if (this.def.spawn) make(this.def.spawn, this.progress - CELL);
+    if (this.def.split && this.gen < this.def.split) {
+      // шут розпадається на двох з половиною здоров'я; душі — лише за найменших
+      for (const off of [-8, 8]) {
+        const e = make(this.type, this.progress + off);
+        e.gen = this.gen + 1;
+        e.maxHp = e.hp = Math.max(1, Math.round(this.maxHp / 2));
+        e.radius = this.radius * 0.8;
+        e.revealed = this.revealed;
+        e.reward = e.gen === this.def.split ? Math.round(this.def.splitReward * this.muls[1]) : 0;
+      }
+    }
     return out;
   }
 
@@ -740,6 +752,52 @@ function drawAdventurer(ctx, type, r, color) {
       break;
     }
 
+    case 'jester': {
+      body();
+      ctx.fillStyle = '#f2d24a';                                // жовті ромби на строкатому вбранні
+      for (const oy of [-r * 0.5, r * 0.5]) {
+        ctx.beginPath();
+        ctx.moveTo(-r * 0.2, oy - r * 0.25); ctx.lineTo(r * 0.02, oy);
+        ctx.lineTo(-r * 0.2, oy + r * 0.25); ctx.lineTo(-r * 0.42, oy);
+        ctx.fill();
+      }
+      for (const side of [-1, 1]) {                             // ковпак: два ріжки вбоки-назад з дзвониками
+        ctx.beginPath();
+        ctx.moveTo(r * 0.3, side * r * 0.15);
+        ctx.quadraticCurveTo(r * 0.1, side * r * 0.9, -r * 0.55, side * r * 1.0);
+        ctx.lineTo(-r * 0.05, side * r * 0.1);
+        ctx.fillStyle = side < 0 ? '#3a2a7a' : color;
+        ctx.fill();
+        outline();
+        ctx.beginPath();
+        ctx.arc(-r * 0.55, side * r * 1.0, 2.2, 0, Math.PI * 2);
+        ctx.fillStyle = '#ffd86b';
+        ctx.fill();
+      }
+      ellipse(r * 0.15, 0, r * 0.3, r * 0.3, '#f0d8c0');        // обличчя
+      break;
+    }
+
+    case 'blade': {
+      ellipse(-r * 0.2, 0, r * 0.6, r * 1.0, '#2c3a52', false); // легкий плащ
+      for (const side of [-1, 1]) {                             // два клинки навхрест уперед
+        ctx.save();
+        ctx.translate(r * 0.2, side * r * 0.55);
+        ctx.rotate(-side * 0.35);
+        ctx.fillStyle = '#eef4ff';
+        ctx.fillRect(0, -1.2, r * 1.3, 2.4);
+        ctx.fillStyle = '#c9a227';
+        ctx.fillRect(-1, -3, 2.5, 6);
+        ctx.restore();
+      }
+      body();
+      ellipse(r * 0.1, 0, r * 0.38, r * 0.38, '#2a1e18');       // темне волосся
+      ellipse(-r * 0.3, 0, r * 0.14, r * 0.14, '#2a1e18');      // вузол на потилиці
+      ctx.fillStyle = '#b22a2a';                                // червона пов'язка
+      ctx.fillRect(r * 0.05, -r * 0.38, 2, r * 0.76);
+      break;
+    }
+
     default: // 'normal' — воїн
       sword();
       body();
@@ -1123,6 +1181,11 @@ class Projectile {
   }
 
   explode(game) {
+    if (alive(this.target) && this.target.def.deflect && Math.random() < this.target.def.deflect) {
+      // майстер меча відбиває снаряд — ні урону, ні вибуху
+      game.effects.push({ kind: 'spark', x: this.target.x, y: this.target.y, t: 0.3, max: 0.3, color: '#eef4ff' });
+      return;
+    }
     if (this.splash) {
       for (const e of game.enemies) {
         if (e.dead || e.escaped) continue;

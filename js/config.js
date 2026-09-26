@@ -89,6 +89,10 @@ const TOWERS = {
 //   lastStand  — перший смертельний удар лишає 1 HP
 //   magicImmune — магічні атаки (monster.magic) не завдають урону
 //   spawn      — хто з'являється на клітинку позаду, коли цей гине
+//   split      — скільки разів ділиться: гинучи, розпадається на двох з половиною здоров'я;
+//                душі дають лише останні (splitReward кожен)
+//   deflect    — шанс відбити снаряд (стріла, фаєрбол, слиз, блискавка); промені й аури не відбиваються
+//   light      — легкий обладунок: живі лати зачіпають його разом із сусідом
 //   heal       — лікує себе й сусідів: radius (кл.), amount (частка maxHp), every (с)
 //   stealth    — невидимий: б'ють лише монстри з detect, або всі, поки він у радіусі такого монстра
 //   lifeDmg    — скільки міцності Серця знімає при прориві (за замовчуванням 1)
@@ -96,25 +100,30 @@ const TOWERS = {
 const SHIELD_REGEN_DELAY = 2;
 const FORMATION_GAP = 26;     // px: наздогнавши попереднього в загоні, авантюрист іде його кроком
 const ENEMIES = {
-  normal: { name: 'Воїн',    color: '#b0b8c4', hp: 40,  speed: 60,  reward: 5,  radius: 10,
+  normal: { name: 'Воїн',    color: '#b0b8c4', hp: 40,  speed: 60,  reward: 5,  radius: 10, light: true,
             desc: 'Надійний шукач пригод, середній у всьому' },
-  fast:   { name: 'Злодій',  color: '#4f7a4a', hp: 22,  speed: 110, reward: 5,  radius: 8,
+  fast:   { name: 'Злодій',  color: '#4f7a4a', hp: 22,  speed: 110, reward: 5,  radius: 8, light: true,
             desc: 'Швидкий, але крихкий' },
   tank:   { name: 'Паладин', color: '#e6c35c', hp: 160, speed: 35,  reward: 15, radius: 14,
             slowImmune: true, haste: { radius: 1.5, mul: 1.25 }, countMul: 0.5,
             desc: 'Повільний і дуже міцний, не мерзне; його бойовий клич пришвидшує всіх поруч' },
   gnome:  { name: 'Гном-латник', color: '#7a6a5a', hp: 90, speed: 45, reward: 8, radius: 11, armor: 6, lastStand: true,
             desc: 'Важкі лати зрізають урон кожного удару, а впертість дає пережити смертельний удар' },
-  priest: { name: 'Жрець',   color: '#e8e0d0', hp: 60,  speed: 50,  reward: 10, radius: 10,
+  priest: { name: 'Жрець',   color: '#e8e0d0', hp: 60,  speed: 50,  reward: 10, radius: 10, light: true,
             heal: { radius: 1.5, amount: 0.06, every: 2 },
             desc: 'Молитвою лікує себе й усіх поруч — убивай першим' },
-  mage:   { name: 'Бойовий маг', color: '#5a3fa0', hp: 80, speed: 55, reward: 12, radius: 10,
+  mage:   { name: 'Бойовий маг', color: '#5a3fa0', hp: 80, speed: 55, reward: 12, radius: 10, light: true,
             shield: 0.35, shieldRegen: 0.12, slowImmune: true, magicImmune: true,
             desc: 'Розсіює будь-яку магію (імп, лич, біхолдер, вампір); щит відновлюється, якщо мага 2 с не били' },
   scout:  { name: 'Ельф-розвідник', color: '#3f6f5a', hp: 35, speed: 120, reward: 8, radius: 8, stealth: true,
             desc: 'Невидимий: його видно лише поруч із привидом чи оком' },
   knight: { name: 'Вершник', color: '#9aa4b0', hp: 180, speed: 75,  reward: 18, radius: 14, armor: 2, lifeDmg: 2, spawn: 'normal',
             desc: 'Швидкий і міцний, прорвавшись, б’є Серце вдвічі сильніше; збитий з коня, лишає воїна' },
+  jester: { name: 'Шут', color: '#c23a5a', hp: 90, speed: 70, reward: 0, radius: 11, stealth: true,
+            split: 2, splitReward: 2,
+            desc: 'Невидимий блазень: гинучи, розпадається на двох менших, а ті — ще на двох' },
+  blade:  { name: 'Майстер меча', color: '#b8c4d4', hp: 60, speed: 65, reward: 10, radius: 10, deflect: 0.5,
+            desc: 'Відбиває мечем половину снарядів; промінь біхолдера не відіб’єш' },
   hero:   { name: 'Герой',   color: '#d4a82a', hp: 500, speed: 30, reward: 100, radius: 17,
             armor: 4, shield: 0.25, lifeDmg: 5, boss: true,
             desc: 'Легендарний бос: броня, щит, величезне здоров’я' },
@@ -143,10 +152,10 @@ const FIRST_WAVES = [
 
 // З якого набігу тип з'являється в генерованих набігах.
 // Не на кратних 5 — там тематичні й бос-набіги, а новачок має з'явитися у звичайному набігу першим.
-const ENEMY_UNLOCK = { normal: 1, fast: 3, tank: 5, gnome: 11, priest: 14, mage: 18, scout: 23, knight: 27 };
+const ENEMY_UNLOCK = { normal: 1, fast: 3, tank: 5, gnome: 11, priest: 14, mage: 18, scout: 23, knight: 27, jester: 33, blade: 38 };
 // Інтервал появи всередині групи (с) до скорочення з набігами.
 const SPAWN_GAP = {
-  normal: 0.7, fast: 0.45, tank: 1.6, gnome: 1.0, priest: 1.0, mage: 1.0, scout: 0.6, knight: 1.2, hero: 2,
+  normal: 0.7, fast: 0.45, tank: 1.6, gnome: 1.0, priest: 1.0, mage: 1.0, scout: 0.6, knight: 1.2, jester: 0.9, blade: 0.8, hero: 2,
 };
 
 // Шаблони загонів у порядку строю: авангард (паладин/гном/вершник) → основа (воїни) → тил (жрець/маг).
@@ -163,6 +172,9 @@ const SQUADS = [
   { name: 'Тіньова група',     units: [['scout', 2], ['fast', 2]] },
   { name: 'Кавалерійський наскок', units: [['knight', 1], ['scout', 1]] },
   { name: 'Велика експедиція', units: [['knight', 1], ['gnome', 1], ['normal', 2], ['mage', 1], ['priest', 1]] },
+  { name: 'Мандрівний цирк',   units: [['jester', 1], ['fast', 2]] },
+  { name: 'Школа меча',        units: [['blade', 2], ['normal', 2]] },
+  { name: 'Легендарний загін', units: [['knight', 1], ['blade', 2], ['jester', 1], ['priest', 1]] },
 ];
 
 // Детермінований «рандом» 0..1 від чисел — і для візерунку мапи, і для складу набігів
@@ -176,7 +188,8 @@ function hash(a, b, seed = 0) {
 // «Розмір набігу»: швидко росте до 38-го, далі повільніше, але без стелі — інакше пізні набіги стають легкими.
 const waveSize = n => n <= 38 ? 1 + n * 0.08 : 4.04 + (n - 38) * 0.03;
 // «Загроза» загону: HP × швидкість (відносно воїна) × удар по Серцю — швидких і вершників у набігу менше.
-const threat = t => ENEMIES[t].hp * ENEMIES[t].speed / 60 * (ENEMIES[t].lifeDmg || 1)
+// шут із нащадками має втричі більше сумарного HP (1 + 2×½ + 4×¼)
+const threat = t => ENEMIES[t].hp * ENEMIES[t].speed / 60 * (ENEMIES[t].lifeDmg || 1) * ((ENEMIES[t].split || 0) + 1)
   + (ENEMIES[t].spawn ? threat(ENEMIES[t].spawn) : 0);
 const squadMass = s => s.units.reduce((m, [t, c]) => m + threat(t) * c * (ENEMIES[t].countMul || 1), 0);
 
