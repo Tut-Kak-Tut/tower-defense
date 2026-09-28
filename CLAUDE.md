@@ -29,7 +29,7 @@ HTML5 Canvas + чистий JavaScript, без збірки і залежнос�
 - `js/adventurers/adventurer.js` — `Adventurer` (вид авантюриста) і `AdventurerBuilder`; реєстри `ENEMIES`, `ENEMY_UNLOCK`, `SPAWN_GAP` заповнює `build()`
   (перевіряє обов'язкові поля, набіг появи після 10-го не кратний 5, `setSpawnOnDeath` — лише на вже оголошеного).
   `setEscort(type)` — ходить лише в загоні з `type` (жрець — з паладином); перевіряють `WaveBuilder.build()` і `EndlessBuilder.build()`.
-- `js/adventurers/adventurers.js` — самі авантюристи ланцюжками `new AdventurerBuilder(id)…build()`; порядок = порядок у бестіарії.
+- `js/adventurers/adventurers.js` — самі авантюристи ланцюжками `new AdventurerBuilder(id)…build()`; порядок = порядок на головній (картки рівнів).
   Сила з набігами — опорні точки `setWave(n, {hp, speed, reward, armor, splitReward})`: між ними лінійно, після останньої —
   тим самим темпом (`Adventurer.statsAt(n)`); точки згенеровані зі старої кривої HP `1 + 0.12(n−1) + 0.0019(n−1)²`.
 - `js/waves/wave.js` — `WaveBuilder` (`.squad(пауза).add(тип, к-сть, інтервал, баф?)`, `.buff({hp, speed, reward, armor})`) → реєстр `WAVES`;
@@ -53,7 +53,7 @@ HTML5 Canvas + чистий JavaScript, без збірки і залежнос�
   (`setProgress(p)` ставить на будь-яке місце шляху за `PATH_LEN`; `spawnOnDeath()` — воїн вершника, половинки шута,
   їм ставиться `summoned` і `origin` — панель набігу рахує за `origin`; `speed` — з прискоренням носія прапора `hasted`;
   носій прапора `undying` не падає нижче 1 HP, поки живий хтось не-`undying` (`hasGuards`), і монстри цілять його останнім (`Tower.priority` / `betterTarget`); щит паладина `shieldAura`
-  поглинає урон і по сусідах (`shieldGuards`); `magicWard` мага ріже магічний урон (`TOWERS[src].magic`) поруч;
+  поглинає урон і по сусідах (`shieldGuards`); `magicWard` мага повністю гасить магічний урон (`TOWERS[src].magic`) по собі й поруч;
   броня `physArmor` (гном) не діє проти магії; `Tower.canHit(e)` — хто кого взагалі може цілити; `Tower.aim` — фільтр цілі з `TARGET_MODES` (перший/останній/сильний/слабкий/ближній), `Tower.aims` — чи монстр сам обирає ціль),
   (броня/щит/отрута/лікування/оглушення/невидимість через `hidden`/`revealed`), `Tower` (атаки `projectile`/`aura`/`beam`/`web` — павук раз на `rate` стріляє павутиною в конус `cone` перед собою — усі в ньому стоять `hold` с через `stun(t, webbed)` (кокон замість зірочок, ефект `cone`), без урону; з рівнем ростуть утримання, дальність і частота,
   детектори підсвічують невидимих; біхолдер `fixedDir` б'є смугою `beamWidth` у бік `dir` з `DIRS`, зона дії — `reaches(e)`
@@ -67,7 +67,8 @@ HTML5 Canvas + чистий JavaScript, без збірки і залежнос�
   малювання: `buildMapLayer()` (кеш), факели, Серце, віньєтка, `drawEffect` (ефекти за `kind`: beam/bolt/quake/кола); цикл `frame`.
 - `js/ui.js` — об'єкт `ui` (placing/selected/hover/tab), події миші й клавіатури (монстри — `towerTypes`, у рівні лише його; вибір монстра — лише кліком;
   подвійний клік по орку — кидок), `refreshUI()` кожен кадр, `refreshOverlay()` (кінець гри), старт гри за URL; 🏠 — на головну.
-  Розкладка: зліва панель набігу (`refreshRaid`) і бестіарій (`refreshBestiary`, за `game.seen` — хто вже з'являвся за цю гру);
+  Розкладка: зліва панель набігу (`refreshRaid`; наведення на рядок — картка авантюриста `showFoeTip` із силою на цьому набігу й `enemyTraits`,
+  позначка «новий» — за `game.seen`, хто ще не з'являвся за цю гру); окремого бестіарію немає;
   центр — canvas; справа вкладки «Монстри» / «Посилення» (`refreshUpgrade`, «зараз → після» через `towerStats()`).
   Праворуч від вкладок — окрема колонка статистики (`refreshStats`): урон за набіг / за гру / вбивства; урон зараховується через `Enemy.hit(dmg, pierce, src)`
   (`src` = тип монстра, отрута пам'ятає `poisonSrc`) — нова атака має передавати `src`.

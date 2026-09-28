@@ -1,4 +1,4 @@
-// Інтерфейс: кнопки, миша, клавіатура, панелі набігу, бестіарію і посилення.
+// Інтерфейс: кнопки, миша, клавіатура, панелі набігу і посилення.
 
 const ui = {
   placing: null,   // тип вежі, яку зараз ставимо
@@ -9,11 +9,11 @@ const ui = {
 
 const $ = id => document.getElementById(id);
 
-// Рядок ворога для панелі набігу й бестіарію.
+// Рядок ворога для панелі набігу.
 function foeRow(type) {
   const row = document.createElement('div');
   row.className = 'foe';
-  const icon = document.createElement('span'); // фон окремо від canvas, щоб силует «???» не зафарбовував його
+  const icon = document.createElement('span');
   icon.className = 'f-icon';
   icon.appendChild(enemyIcon(type));
   row.appendChild(icon);
@@ -70,13 +70,6 @@ function cancelSelection() {
 // ---------- вкладки ----------
 $('tabMonsters').addEventListener('click', () => { ui.tab = 'monsters'; });
 $('tabUpgrade').addEventListener('click', () => { ui.tab = 'upgrade'; });
-
-// ---------- бестіарій: рядки створюються один раз ----------
-const bestiary = {};
-for (const type of Object.keys(ENEMIES)) {
-  bestiary[type] = foeRow(type);
-  $('bestiaryList').appendChild(bestiary[type].row);
-}
 
 // ---------- миша ----------
 function cellFromEvent(e) {
@@ -241,6 +234,7 @@ function refreshRaid() {
   if (key !== raidKey) {
     raidKey = key;
     raidRows = {};
+    hideFoeTip();
     const list = $('raidList');
     list.textContent = '';
     if (index >= maxWaves()) {
@@ -252,6 +246,8 @@ function refreshRaid() {
       for (const [type, count] of Object.entries(raidGroups(index))) {
         const r = foeRow(type);
         r.total = count;
+        r.row.addEventListener('mouseenter', () => showFoeTip(type, index + 1, r.row));
+        r.row.addEventListener('mouseleave', hideFoeTip);
         raidRows[type] = r;
         list.appendChild(r.row);
       }
@@ -259,9 +255,9 @@ function refreshRaid() {
   }
 
   for (const [type, r] of Object.entries(raidRows)) {
-    const known = game.seen.has(type);
-    r.name.textContent = known ? ENEMIES[type].name : L('Невідомий', 'Неизвестный');
-    r.row.classList.toggle('locked', !known);
+    r.name.textContent = ENEMIES[type].name;
+    r.name.dataset.badge = L('новий', 'новый');
+    r.row.classList.toggle('fresh', !game.seen.has(type));   // ще не з'являвся за цю гру
     if (game.waveActive) {
       const left = game.spawnQueue.filter(s => s.type === type).length +
         game.enemies.filter(e => e.origin === type).length;   // разом із тими, хто з них з'явився
@@ -270,23 +266,23 @@ function refreshRaid() {
       r.row.classList.toggle('done', left === 0);
     } else {
       r.count.textContent = `×${r.total}`;
-      r.sub.textContent = known ? ENEMIES[type].desc : L('ще не зустрічався', 'ещё не встречался');
+      r.sub.textContent = ENEMIES[type].desc;
     }
   }
 }
 
-// ---------- бестіарій ----------
-// Особливості авантюриста одним рядком: «броня 6 · щит 50% · …».
+// ---------- картка авантюриста (підказка над рядком набігу) ----------
+// Особливості авантюриста списком: «щит 50%», «не мерзне», …  (броня — окремо, з сили на набігу)
 function enemyTraits(def) {
   const t = [];
-  if (def.armor) t.push(L(`броня ${def.armor}`, `броня ${def.armor}`));
   if (def.shield) t.push(`щит ${Math.round(def.shield * 100)}%${def.shieldRegen ? L(' (відновлюється)', ' (восстанавливается)') : ''}${def.shieldWave ? L(` з ${def.shieldWave}-го набігу`, ` с ${def.shieldWave}-го набега`) : ''}`);
   if (def.slowImmune) t.push(L('не мерзне', 'не мёрзнет'));
   if (def.physArmor) t.push(L('броня лише від фізичних ударів', 'броня только от физических ударов'));
   if (def.shieldAura) t.push(L('щит накриває сусідів', 'щит накрывает соседей'));
   if (def.haste) t.push(L('пришвидшує сусідів на ', 'ускоряет соседей на ') + Math.round((def.haste.mul - 1) * 100) + '%');
   if (def.undying) t.push(L('не гине, поки є союзники; монстри б’ють його останнім', 'не гибнет, пока есть союзники; монстры бьют его последним'));
-  if (def.magicWard) t.push(L(`магічний щит −${Math.round(def.magicWard.cut * 100)}% магії поруч`, `магический щит −${Math.round(def.magicWard.cut * 100)}% магии рядом`));
+  if (def.magicWard) t.push(def.magicWard.cut >= 1 ? L('магія не діє на нього й тих, хто поруч', 'магия не действует на него и тех, кто рядом')
+    : L(`магічний щит −${Math.round(def.magicWard.cut * 100)}% магії поруч`, `магический щит −${Math.round(def.magicWard.cut * 100)}% магии рядом`));
   if (def.escort) t.push(L('ходить лише з: ', 'ходит только с: ') + ENEMIES[def.escort].name.toLowerCase());
   if (def.spawn) t.push(L('гинучи, лишає: ', 'погибая, оставляет: ') + ENEMIES[def.spawn].name.toLowerCase());
   if (def.split) t.push(L(`ділиться ${def.split} рази`, `делится ${def.split} раза`));
@@ -295,23 +291,35 @@ function enemyTraits(def) {
   if (def.heal) t.push(L('лікує', 'лечит'));
   if (def.stealth) t.push(L('невидимий', 'невидимый'));
   if (def.lifeDmg) t.push(L('Серцю −', 'Сердцу −') + def.lifeDmg);
-  return t.length ? '. ' + t.join(' · ') : '';
+  return t;
 }
 
-function refreshBestiary() {
-  for (const [type, r] of Object.entries(bestiary)) {
-    const known = game.seen.has(type);
-    const def = ENEMIES[type];
-    r.row.classList.toggle('locked', !known);
-    r.name.textContent = known ? def.name : '???';
-    // шут дає душі лише за найменших — показуємо суму за всю родину
-    const reward = def.split ? def.splitReward * 2 ** def.split : def.reward;
-    r.count.textContent = known ? `👻 ${reward}` : '';
-    r.sub.textContent = known
-      ? `${def.desc}. ${L("Здоров'я", 'Здоровье')} ${def.hp}, ${L('швидкість', 'скорость')} ${def.speed}${enemyTraits(def)}`
-      : L('Ще не зустрічався в підземеллі', 'Ещё не встречался в подземелье');
-  }
+const foeTip = document.createElement('div');
+foeTip.id = 'foeTip';
+foeTip.className = 'hidden';
+document.body.appendChild(foeTip);
+
+// Сила — на набігу n з бафом усього набігу (баф окремих груп не враховано).
+function showFoeTip(type, n, row) {
+  const def = ENEMIES[type];
+  const s = adventurerStats(type, n, waveBuff(n));
+  // шут дає душі лише за найменших — показуємо суму за всю родину
+  const reward = Math.round(def.split ? s.splitReward * 2 ** def.split : s.reward);
+  const traits = enemyTraits(def);
+  foeTip.innerHTML =
+    `<div class="ft-head"><b>${def.name}</b><span>👻 ${reward}</span></div>` +
+    `<p>${def.desc}</p>` +
+    `<div class="ft-stats">❤️ ${Math.round(s.hp)} · 👟 ${Math.round(s.speed)}` +
+    (s.armor >= 0.5 ? ` · 🛡️ ${Math.round(s.armor)}` : '') + '</div>' +
+    (traits.length ? `<ul>${traits.map(t => `<li>${t}</li>`).join('')}</ul>` : '');
+  foeTip.classList.remove('hidden');
+  const r = row.getBoundingClientRect();
+  const h = foeTip.offsetHeight;
+  foeTip.style.left = `${r.right + 8}px`;
+  foeTip.style.top = `${Math.max(8, Math.min(r.top, innerHeight - h - 8))}px`;
 }
+
+function hideFoeTip() { foeTip.classList.add('hidden'); }
 
 // ---------- вкладка «Посилення» ----------
 let upKey = null; // таблиця й іконка перебудовуються лише коли змінився монстр чи його рівень
@@ -497,7 +505,6 @@ function refreshUI() {
   }
 
   refreshRaid();
-  refreshBestiary();
 
   $('tabMonsters').classList.toggle('active', ui.tab === 'monsters');
   $('tabUpgrade').classList.toggle('active', ui.tab === 'upgrade');

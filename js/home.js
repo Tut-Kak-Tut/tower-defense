@@ -34,7 +34,7 @@ function mapPreview(level) {
   return c;
 }
 
-// Хто з авантюристів з'являється в набігах рівня — у порядку бестіарію.
+// Хто з авантюристів з'являється в набігах рівня — у порядку оголошення в adventurers.js.
 function levelFoes(level) {
   const types = new Set();
   for (let n = level.from; n <= level.to; n++) for (const [type] of waveGroups(n)) types.add(type);
