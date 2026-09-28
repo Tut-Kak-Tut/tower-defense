@@ -52,7 +52,7 @@ const DIRS = [
 
 // Поточний рівень — з ?level= у game.html; без нього (кампанія, безкінечний) — стандартна мапа.
 const LEVEL = LEVELS[new URLSearchParams(location.search).get('level')] || null;
-const PATH_POINTS = LEVEL ? LEVEL.path : DEFAULT_PATH;
+const PATH_POINTS = LEVEL ? LEVEL.paths[0].points : DEFAULT_PATH;
 const TORCHES = LEVEL ? LEVEL.torches : DEFAULT_TORCHES;
 
 const PATH_PX = PATH_POINTS.map(([c, r]) => cellCenter(c, r));

@@ -8,9 +8,8 @@ new LevelBuilder('cellar')
   .setWaves(1, 15)
   .setMoney(150)
   .setMonsters(['archer', 'cannon', 'frost', 'spider', 'slime'])
-  .setMap(
-    [[-1, 5], [6, 5], [6, 2], [13, 2], [13, 8], [20, 8]],
-    [[3, 4], [9, 1], [10, 3], [15, 7], [17, 9], [2, 6]])
+  .addPath([[-1, 5], [6, 5], [6, 2], [13, 2], [13, 8], [20, 8]])
+  .setTorches([[3, 4], [9, 1], [10, 3], [15, 7], [17, 9], [2, 6]])
   .build();
 
 new LevelBuilder('crypt')
@@ -19,9 +18,8 @@ new LevelBuilder('crypt')
   .setWaves(11, 30)
   .setMoney(600)
   .setMonsters(['archer', 'frost', 'spider', 'golem', 'lich', 'slime', 'grave'])
-  .setMap(
-    [[-1, 1], [17, 1], [17, 4], [2, 4], [2, 7], [17, 7], [17, 10], [20, 10]],
-    [[4, 0], [10, 0], [9, 3], [12, 5], [5, 6], [14, 8], [8, 11]])
+  .addPath([[-1, 1], [17, 1], [17, 4], [2, 4], [2, 7], [17, 7], [17, 10], [20, 10]])
+  .setTorches([[4, 0], [10, 0], [9, 3], [12, 5], [5, 6], [14, 8], [8, 11]])
   .build();
 
 new LevelBuilder('tomb')
@@ -30,9 +28,8 @@ new LevelBuilder('tomb')
   .setWaves(31, 50)
   .setMoney(9000)
   .setMonsters(['cannon', 'frost', 'lich', 'eye', 'vampire', 'plate', 'witch'])
-  .setMap(
-    [[-1, 10], [3, 10], [3, 1], [10, 1], [10, 9], [16, 9], [16, 2], [20, 2]],
-    [[1, 8], [6, 4], [7, 11], [13, 6], [18, 5], [12, 0]])
+  .addPath([[-1, 10], [3, 10], [3, 1], [10, 1], [10, 9], [16, 9], [16, 2], [20, 2]])
+  .setTorches([[1, 8], [6, 4], [7, 11], [13, 6], [18, 5], [12, 0]])
   .build();
 
 new LevelBuilder('mountain')
@@ -41,7 +38,6 @@ new LevelBuilder('mountain')
   .setWaves(51, 70)
   .setMoney(27000)
   .setMonsters(Object.keys(TOWERS))
-  .setMap(
-    [[-1, 6], [5, 6], [5, 1], [9, 1], [9, 10], [13, 10], [13, 3], [17, 3], [17, 8], [20, 8]],
-    [[2, 4], [7, 5], [11, 7], [15, 6], [19, 5], [11, 1]])
+  .addPath([[-1, 6], [5, 6], [5, 1], [9, 1], [9, 10], [13, 10], [13, 3], [17, 3], [17, 8], [20, 8]])
+  .setTorches([[2, 4], [7, 5], [11, 7], [15, 6], [19, 5], [11, 1]])
   .build();

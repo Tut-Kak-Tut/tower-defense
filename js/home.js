@@ -15,16 +15,20 @@ function mapPreview(level) {
   g.fillStyle = '#1b1722';
   g.fillRect(0, 0, c.width, c.height);
   g.fillStyle = 'hsl(30, 8%, 32%)';
-  const p = level.path;
-  for (let i = 1; i < p.length; i++) {
-    const [c1, r1] = p[i - 1], [c2, r2] = p[i];
-    const x = Math.max(0, Math.min(c1, c2)), y = Math.min(r1, r2);
-    const w = Math.min(COLS - 1, Math.max(c1, c2)) - x + 1, h = Math.abs(r2 - r1) + 1;
-    g.fillRect(x * s, y * s, w * s, h * s);
+  for (const { points: p } of level.paths) {
+    for (let i = 1; i < p.length; i++) {
+      const [c1, r1] = p[i - 1], [c2, r2] = p[i];
+      const x = Math.max(0, Math.min(c1, c2)), y = Math.max(0, Math.min(r1, r2));
+      const w = Math.min(COLS - 1, Math.max(c1, c2)) - x + 1, h = Math.min(ROWS - 1, Math.max(r1, r2)) - y + 1;
+      g.fillRect(x * s, y * s, w * s, h * s);
+    }
   }
+  g.fillStyle = 'hsl(260, 6%, 50%)';   // завали
+  for (const [rc, rr] of level.rocks) g.fillRect(rc * s + 1, rr * s + 1, s - 2, s - 2);
   g.fillStyle = '#ff9a3c';
   for (const [tc, tr] of level.torches) g.fillRect(tc * s + s / 2 - 2, tr * s + s / 2 - 2, 4, 4);
-  const [, er] = p[p.length - 1];
+  const heart = level.paths[0].points;
+  const [, er] = heart[heart.length - 1];
   g.fillStyle = '#d43cb4';
   g.shadowColor = '#b35cff';
   g.shadowBlur = 8;
