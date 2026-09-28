@@ -324,6 +324,28 @@ button.danger:hover { background: linear-gradient(#7a1f30, #5a1522); border-colo
 .tower-btn .t-name { font-weight: 600; }
 .tower-btn .t-cost { font-weight: 600; color: var(--soul); }
 .tower-btn .t-desc { grid-column: 2 / 4; font-size: 12px; color: var(--muted); }
+.tower-btn .t-tags { grid-column: 2 / 4; }
+
+/* теги монстра: роль, тип урону, ефекти */
+.tags { display: flex; flex-wrap: wrap; gap: 3px; margin: 2px 0; }
+#upTags { margin: 6px 0 0; }
+.tag {
+  font-size: 10px;
+  line-height: 1;
+  padding: 3px 6px;
+  border-radius: 8px;
+  border: 1px solid #4a4058;
+  background: #221c2b;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.tag.role-attack { color: #ffb0a0; border-color: #8a3a30; background: #3a1c1a; }
+.tag.role-support { color: #a8d8ff; border-color: #35607e; background: #182838; }
+.tag.role-buff { color: #e0b8ff; border-color: #6a4590; background: #2a1c3a; }
+.tag.role-economy { color: #ffe08a; border-color: #7e6a2a; background: #33291a; }
+.tag.phys { color: #e8dcc0; border-color: #6e6450; }
+.tag.magic { color: #c9a0ff; border-color: #5e3f8a; }
+.tag.pierce { color: #ffd27a; border-color: #7a6030; }
 .tower-btn.active {
   outline: 2px solid var(--violet);
   background: linear-gradient(#43375a, #2f2740);

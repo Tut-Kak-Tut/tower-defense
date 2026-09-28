@@ -24,6 +24,7 @@ HTML5 Canvas + чистий JavaScript, без збірки і залежнос�
 - `js/monsters/monster.js` — `Monster` (вид монстра) і `MonsterBuilder`: `set…` задають 1-й рівень, `setLevel(N, {upgradeCost, стат…})` —
   що змінюється на рівні N (решта переходить з попереднього). `build()` перевіряє поля/рівні й кладе монстра в реєстр `TOWERS` (оголошений тут же); види атаки описані над `ATTACKS`,
   рівні зберігаються як `def.levels` (масиви на 10 рівнів + `upgrade`), `towerStats()` читає їх за `LEVEL_STATS`.
+  Роль `setRole` (обов'язкова, з `ROLES`: attack/support/buff/economy); `monsterTags(def)` — чіпи для UI: роль + тип урону й ефекти, що рахуються з характеристик (нова механіка — додати рядок туди).
 - `js/monsters/monsters.js` — самі монстри: по ланцюжку `new MonsterBuilder(id)…build()` на кожного. Баланс монстрів правити тут.
 - `js/adventurers/adventurer.js` — `Adventurer` (вид авантюриста) і `AdventurerBuilder`; реєстри `ENEMIES`, `ENEMY_UNLOCK`, `SPAWN_GAP` заповнює `build()`
   (перевіряє обов'язкові поля, набіг появи після 10-го не кратний 5, `setSpawnOnDeath` — лише на вже оголошеного).

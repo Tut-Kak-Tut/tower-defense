@@ -28,6 +28,11 @@ function foeRow(type) {
 }
 
 // ---------- кнопки веж ----------
+// чіпи тегів монстра (роль, тип урону, ефекти) — monsterTags() з monster.js
+function tagsHTML(def) {
+  return monsterTags(def).map(t => `<span class="tag ${t.kind}">${t.text}</span>`).join('');
+}
+
 const towerTypes = LEVEL ? LEVEL.monsters : Object.keys(TOWERS);   // у рівні — лише його монстри
 const towerButtons = {};
 towerTypes.forEach(type => {
@@ -38,6 +43,7 @@ towerTypes.forEach(type => {
   btn.insertAdjacentHTML('beforeend',
     `<span class="t-name">${def.name}</span>` +
     `<span class="t-cost">👻 ${def.cost}</span>` +
+    `<span class="t-tags tags">${tagsHTML(def)}</span>` +
     `<span class="t-desc">${def.desc}</span>`);
   btn.addEventListener('click', () => selectTowerType(type));
   $('towerList').appendChild(btn);
@@ -347,6 +353,7 @@ function refreshUpgrade() {
     if (!upTower || upTower.type !== t.type) {
       $('upIcon').textContent = '';
       $('upIcon').appendChild(towerIcon(t.type, 48));
+      $('upTags').innerHTML = tagsHTML(TOWERS[t.type]);
     }
     upTower = t;
     upKey = key;

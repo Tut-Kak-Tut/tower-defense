@@ -19,6 +19,13 @@ const LEVEL_STATS = ['damage', 'damageMax', 'range', 'rate', 'targets', 'hold', 
 //           every росте на 1 кожні everyGrow набігів (Monster.graveEvery).
 const ATTACKS = ['projectile', 'aura', 'beam', 'haunt', 'drain', 'cleave', 'buff', 'manual', 'web', 'grave'];
 
+// Ролі (setRole) — тег на кнопці монстра: attack — б'є сам, support — контроль/дебаф, buff — посилює інших, economy — дає душі.
+const ROLES = {
+  attack: L('Атакуючий', 'Атакующий'),
+  support: L('Помічник', 'Помощник'),
+  buff: L('Бафер', 'Бафер'),
+  economy: L('Економіка', 'Экономика'),
+};
 
 class Monster {
   // Створює лише MonsterBuilder.build(): params — усі поля, levels — { стат: [значення на рівнях 1…MAX_LEVEL],
@@ -49,6 +56,7 @@ class MonsterBuilder {
   setDescription(text) { return this.set('desc', text); }
   setColor(color) { return this.set('color', color); }
   setCost(souls) { return this.set('cost', souls); }                // ціна купівлі
+  setRole(role) { return this.set('role', role); }                  // один з ROLES
   setAttack(kind) { return this.set('attack', kind); }              // один з ATTACKS, за замовчуванням 'projectile'
 
   // --- атака (значення 1-го рівня) ---
@@ -95,7 +103,8 @@ class MonsterBuilder {
     const id = this.id, p = { attack: 'projectile', ...this.params };
     const fail = msg => { throw new Error(`Монстр '${id}': ${msg}`); };
     if (TOWERS[id]) fail('такий id уже є');
-    for (const key of ['name', 'desc', 'color', 'cost']) if (p[key] === undefined) fail(`не задано ${key}`);
+    for (const key of ['name', 'desc', 'color', 'cost', 'role']) if (p[key] === undefined) fail(`не задано ${key}`);
+    if (!ROLES[p.role]) fail(`невідома роль '${p.role}'`);
     if (!ATTACKS.includes(p.attack)) fail(`невідома атака '${p.attack}'`);
 
     // рівні: кожна характеристика, що є в setLevel, — масив значень на рівнях 1…MAX_LEVEL
@@ -123,4 +132,29 @@ class MonsterBuilder {
     TOWERS[id] = monster;
     return monster;
   }
+}
+
+// Теги монстра для UI: [{ text, kind }] — роль (задана), тип урону й ефекти (рахуються з характеристик).
+// kind — CSS-клас чіпа: role-<роль> / phys / magic / pierce / fx.
+function monsterTags(def) {
+  const tags = [{ text: ROLES[def.role], kind: 'role-' + def.role }];
+  if (def.damage) {
+    tags.push(def.magic ? { text: L('Магічний', 'Магический'), kind: 'magic' } : { text: L('Фізичний', 'Физический'), kind: 'phys' });
+  }
+  if (def.armorPierce) tags.push({ text: L('Крізь броню', 'Сквозь броню'), kind: 'pierce' });
+  const fx = [
+    [def.splash || def.attack === 'aura', L('По площі', 'По площади')],
+    [def.attack === 'beam', L('Пробиває', 'Пробивает')],
+    [def.levels.chainRange, L('Ланцюг', 'Цепь')],
+    [def.slow, L('Сповільнює', 'Замедляет')],
+    [def.frail, L('Крихкість', 'Хрупкость')],
+    [def.attack === 'web', L('Знерухомлює', 'Обездвиживает')],
+    [def.stun, L('Оглушує', 'Оглушает')],
+    [def.poison, L('Отрута', 'Яд')],
+    [def.knock, L('Відкидає', 'Отбрасывает')],
+    [def.detect, L('Бачить невидимих', 'Видит невидимых')],
+    [def.unique, L('Лише один', 'Только один')],
+  ];
+  for (const [on, text] of fx) if (on) tags.push({ text, kind: 'fx' });
+  return tags;
 }
