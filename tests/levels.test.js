@@ -67,3 +67,11 @@ test('ROCKS: каміння рівня в грі, без рівня — поро
   assert.ok(rocks.length > 0);
   assert.deepEqual(rocks[0], [0, 10]);
 });
+
+test('Глибини: 71–100, два шляхи, завали', () => {
+  const deep = loadGame()('LEVELS').deep;
+  assert.ok(deep);
+  assert.deepEqual([deep.from, deep.to], [71, 100]);
+  assert.deepEqual(deep.paths.map(p => p.weight), [2, 1]);
+  assert.ok(deep.rocks.length > 0);
+});
