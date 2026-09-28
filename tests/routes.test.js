@@ -67,3 +67,17 @@ test('routeLetter', () => {
   const routeLetter = loadGame()('routeLetter');
   assert.deepEqual([0, 1, 2].map(routeLetter), ['A', 'B', 'C']);
 });
+
+test('«Перший»/«Останній» — за відстанню до Серця, а не за progress свого шляху', () => {
+  const get = game2();
+  const Enemy = get('Enemy'), modes = get('TARGET_MODES'), ROUTES = get('ROUTES');
+  const at = (route, cellsLeft) => {                         // ворог за cellsLeft клітинок до Серця
+    const e = new Enemy('normal', 1);
+    e.setRoute(route, ROUTES[route].len.at(-1) - cellsLeft * 40);
+    return e;
+  };
+  const a = at(0, 8), b = at(1, 4);                          // A довший — у нього progress більший
+  assert.ok(a.progress > b.progress);
+  assert.ok(modes.first.score(b) > modes.first.score(a));    // ближчий до Серця — «перший»
+  assert.ok(modes.last.score(a) > modes.last.score(b));
+});

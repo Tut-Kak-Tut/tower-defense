@@ -120,6 +120,9 @@ class Enemy {
 
   get hidden() { return this.stealth && this.revealed <= 0; }
 
+  // скільки лишилося до Серця — порівнюване між шляхами різної довжини (progress — лише в межах свого шляху)
+  get left() { const { len } = ROUTES[this.route]; return len[len.length - 1] - this.progress; }
+
   // поточна швидкість ходу: сповільнення та прискорення носія прапора (не складається з іншими)
   get speed() {
     return this.stunTimer > 0 ? 0 : this.baseSpeed * this.slowFactor * (this.hasted > 0 ? this.hasteMul : 1);
@@ -467,8 +470,8 @@ class Enemy {
 
 // Фільтри цілі: з доступних монстр бере того, в кого score найбільший.
 const TARGET_MODES = {
-  first:  { label: L('Перший', 'Первый'),  title: L('Найдальший по коридору', 'Дальше всех по коридору'),          score: e => e.progress },
-  last:   { label: L('Останній', 'Последний'), title: L('Найближчий до входу', 'Ближе всех ко входу'),             score: e => -e.progress },
+  first:  { label: L('Перший', 'Первый'),  title: L('Найдальший по коридору', 'Дальше всех по коридору'),          score: e => -e.left },
+  last:   { label: L('Останній', 'Последний'), title: L('Найближчий до входу', 'Ближе всех ко входу'),             score: e => e.left },
   strong: { label: L('Сильний', 'Сильный'), title: L('Найбільше HP (зі щитом)', 'Больше всего HP (со щитом)'),          score: e => e.hp + e.shield },
   weak:   { label: L('Слабкий', 'Слабый'), title: L('Найменше HP (зі щитом)', 'Меньше всего HP (со щитом)'),           score: e => -(e.hp + e.shield) },
   close:  { label: L('Ближній', 'Ближний'), title: L('Найближчий до монстра', 'Ближайший к монстру'),            score: (e, t) => -Math.hypot(e.x - t.x, e.y - t.y) },
