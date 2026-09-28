@@ -3,16 +3,19 @@
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
 
+// Клітинки коридору всіх шляхів (у рівня їх може бути кілька; спільні ділянки — один раз).
 const PATH_CELLS = (() => {
   const cells = new Set();
-  for (let i = 0; i < PATH_POINTS.length - 1; i++) {
-    let [c, r] = PATH_POINTS[i];
-    const [c2, r2] = PATH_POINTS[i + 1];
-    const dc = Math.sign(c2 - c), dr = Math.sign(r2 - r);
-    cells.add(c + ',' + r);
-    while (c !== c2 || r !== r2) {
-      c += dc; r += dr;
+  for (const points of ROUTE_POINTS) {
+    for (let i = 0; i < points.length - 1; i++) {
+      let [c, r] = points[i];
+      const [c2, r2] = points[i + 1];
+      const dc = Math.sign(c2 - c), dr = Math.sign(r2 - r);
       cells.add(c + ',' + r);
+      while (c !== c2 || r !== r2) {
+        c += dc; r += dr;
+        cells.add(c + ',' + r);
+      }
     }
   }
   return cells;
@@ -364,7 +367,7 @@ function buildMapLayer() {
   for (const [c, r] of ROCKS) drawRubble(g, c, r);
 
   // вхід у підземелля — кована ґрата зліва
-  const sy = PATH_POINTS[0][1] * CELL;
+  const sy = ROUTE_POINTS[0][0][1] * CELL;
   g.fillStyle = '#0a080c';
   g.fillRect(0, sy + 2, 10, CELL - 4);
   g.fillStyle = '#5a5060';
@@ -412,7 +415,7 @@ function drawMap() {
 
 // Серце Підземелля — на останній клітинці коридору, пульсує; спалахує червоним при ударі.
 function drawHeart() {
-  const [ec, er] = PATH_POINTS[PATH_POINTS.length - 1];
+  const [ec, er] = ROUTE_POINTS[0][ROUTE_POINTS[0].length - 1];
   const x = (ec - 1) * CELL + CELL / 2, y = er * CELL + CELL / 2;
   const hurt = game.heartFlash / 0.5;
   const beat = 1.35 + 0.12 * Math.max(0, Math.sin(time * 4)) ** 3 + hurt * 0.2;

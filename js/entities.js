@@ -52,16 +52,19 @@ const DIRS = [
 
 // Поточний рівень — з ?level= у game.html; без нього (кампанія, безкінечний) — стандартна мапа.
 const LEVEL = LEVELS[new URLSearchParams(location.search).get('level')] || null;
-const PATH_POINTS = LEVEL ? LEVEL.paths[0].points : DEFAULT_PATH;
 const TORCHES = LEVEL ? LEVEL.torches : DEFAULT_TORCHES;
 const ROCKS = LEVEL ? LEVEL.rocks : [];   // завали: клітинки, де не можна селити монстрів
-
-const PATH_PX = PATH_POINTS.map(([c, r]) => cellCenter(c, r));
-// Пройдена відстань до кожної точки шляху — щоб поставити авантюриста на будь-яке місце (відкидання, поява).
-const PATH_LEN = PATH_PX.map(() => 0);
-for (let i = 1; i < PATH_PX.length; i++) {
-  PATH_LEN[i] = PATH_LEN[i - 1] + Math.hypot(PATH_PX[i].x - PATH_PX[i - 1].x, PATH_PX[i].y - PATH_PX[i - 1].y);
-}
+// Шляхи до Серця: у рівня — addPath (кілька, з вагами), інакше — один стандартний.
+const ROUTE_POINTS = LEVEL ? LEVEL.paths.map(p => p.points) : [DEFAULT_PATH];
+const ROUTE_WEIGHTS = LEVEL ? LEVEL.paths.map(p => p.weight) : [1];
+// Для кожного шляху: центри точок px і пройдена відстань до кожної len — щоб поставити авантюриста
+// на будь-яке місце свого шляху (відкидання, поява).
+const ROUTES = ROUTE_POINTS.map(points => {
+  const px = points.map(([c, r]) => cellCenter(c, r));
+  const len = px.map(() => 0);
+  for (let i = 1; i < px.length; i++) len[i] = len[i - 1] + Math.hypot(px[i].x - px[i - 1].x, px[i].y - px[i - 1].y);
+  return { px, len };
+});
 
 class Enemy {
   // wave — номер набігу (сила — з setWave авантюриста), buff — множники набігу/групи (WaveBuilder)
@@ -89,8 +92,9 @@ class Enemy {
     this.stealth = !!def.stealth;
     this.revealed = 0;    // секунди, поки невидимого підсвічує монстр із detect
     this.healTimer = def.heal ? def.heal.every : 0;
-    this.x = PATH_PX[0].x;
-    this.y = PATH_PX[0].y;
+    this.route = 0;       // індекс шляху в ROUTES (setRoute)
+    this.x = ROUTES[0].px[0].x;
+    this.y = ROUTES[0].px[0].y;
     this.wp = 1;          // індекс наступної точки шляху
     this.progress = 0;    // пройдена відстань — вежі цілять у найдальшого
     this.slowFactor = 1;
@@ -184,9 +188,10 @@ class Enemy {
     if (lead && lead.progress >= this.progress && lead.progress - this.progress < FORMATION_GAP) {
       speed = Math.min(speed, lead.speed);
     }
+    const { px } = ROUTES[this.route];
     let move = speed * dt;
-    while (move > 0 && this.wp < PATH_PX.length) {
-      const t = PATH_PX[this.wp];
+    while (move > 0 && this.wp < px.length) {
+      const t = px[this.wp];
       const dx = t.x - this.x, dy = t.y - this.y;
       const d = Math.hypot(dx, dy);
       this.dir = Math.atan2(dy, dx); // лише для малювання — куди дивиться
@@ -198,22 +203,29 @@ class Enemy {
         this.progress += move; move = 0;
       }
     }
-    if (this.wp >= PATH_PX.length) this.escaped = true;
+    if (this.wp >= px.length) this.escaped = true;
   }
 
-  // Поставити на відстань p від входу (не далі кінця шляху).
+  // Поставити на відстань p від входу свого шляху (не далі кінця).
   setProgress(p) {
-    const end = PATH_LEN[PATH_LEN.length - 1];
+    const { px, len } = ROUTES[this.route];
+    const end = len[len.length - 1];
     p = Math.max(0, Math.min(p, end - 1));
     let i = 1;
-    while (i < PATH_LEN.length - 1 && PATH_LEN[i] <= p) i++;
-    const a = PATH_PX[i - 1], b = PATH_PX[i];
-    const k = (p - PATH_LEN[i - 1]) / (PATH_LEN[i] - PATH_LEN[i - 1]);
+    while (i < len.length - 1 && len[i] <= p) i++;
+    const a = px[i - 1], b = px[i];
+    const k = (p - len[i - 1]) / (len[i] - len[i - 1]);
     this.x = a.x + (b.x - a.x) * k;
     this.y = a.y + (b.y - a.y) * k;
     this.dir = Math.atan2(b.y - a.y, b.x - a.x);
     this.wp = i;
     this.progress = p;
+  }
+
+  // Перевести на шлях i і поставити на відстань p від його входу.
+  setRoute(i, p = 0) {
+    this.route = i;
+    this.setProgress(p);
   }
 
   // Хто з'являється, коли цей авантюрист гине (воїн з-під вершника, половинки шута).
@@ -224,7 +236,7 @@ class Enemy {
       e.origin = this.origin;
       e.summoned = true;
       e.leader = this.leader;
-      e.setProgress(progress);
+      e.setRoute(this.route, progress);   // породжені йдуть тим самим шляхом
       out.push(e);
       return e;
     };
