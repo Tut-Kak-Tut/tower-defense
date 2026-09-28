@@ -43,9 +43,13 @@ towerTypes.forEach(type => {
   btn.insertAdjacentHTML('beforeend',
     `<span class="t-name">${def.name}</span>` +
     `<span class="t-cost">👻 ${def.cost}</span>` +
+    `<span class="t-view" title="${L('Переглянути', 'Посмотреть')}">🔍</span>` +
     `<span class="t-tags tags">${tagsHTML(def)}</span>` +
     `<span class="t-desc">${def.desc}</span>`);
-  btn.addEventListener('click', () => selectTowerType(type));
+  btn.addEventListener('click', e => {
+    if (e.target.closest('.t-view')) openMonsterView(type);   // 🔍 — лише перегляд, монстр не вибирається
+    else selectTowerType(type);
+  });
   $('towerList').appendChild(btn);
   towerButtons[type] = btn;
 });
@@ -55,6 +59,41 @@ function selectTowerType(type) {
   ui.selected = null;
   ui.tab = 'monsters';
 }
+
+// ---------- вікно перегляду монстра: характеристики на рівнях 1 / 5 / 10 ----------
+const VIEW_LEVELS = [1, 5, MAX_LEVEL];
+let viewState = null;   // { wasPaused } — поки вікно відкрите, гра на паузі
+
+function openMonsterView(type) {
+  const def = TOWERS[type];
+  if (!viewState) viewState = { wasPaused: game.paused };
+  game.paused = true;
+  $('mvIcon').textContent = '';
+  $('mvIcon').appendChild(towerIcon(type, 48));
+  $('mvName').textContent = def.name;
+  $('mvTags').innerHTML = tagsHTML(def);
+  $('mvDesc').textContent = def.desc + '.';
+  // скільки душ коштує монстр разом із посиленнями до цього рівня
+  const spent = l => def.cost + def.levels.upgrade.slice(0, l - 1).reduce((a, b) => a + b, 0);
+  $('mvCost').textContent = `👻 ${def.cost}` + L(` · до ${MAX_LEVEL}-го рівня — 👻 ${spent(MAX_LEVEL)}`, ` · до ${MAX_LEVEL}-го уровня — 👻 ${spent(MAX_LEVEL)}`);
+  const rows = [[L('Душ усього', 'Душ всего'), ...VIEW_LEVELS.map(l => '👻 ' + spent(l))], ...statRows(def, VIEW_LEVELS)];
+  $('mvStats').innerHTML =
+    `<tr><th></th>${VIEW_LEVELS.map(l => `<th>${L('Рів.', 'Ур.')} ${l}</th>`).join('')}</tr>` +
+    rows.map(([label, ...v]) => {
+      const cls = v.every(x => String(x) === String(v[0])) ? ' class="same"' : '';   // не росте з рівнем
+      return `<tr${cls}><td>${label}</td>${v.map(x => `<td>${x}</td>`).join('')}</tr>`;
+    }).join('');
+  $('monsterView').classList.remove('hidden');
+}
+
+function closeMonsterView() {
+  if (!viewState) return;
+  game.paused = viewState.wasPaused;
+  viewState = null;
+  $('monsterView').classList.add('hidden');
+}
+$('mvClose').addEventListener('click', closeMonsterView);
+$('monsterView').addEventListener('click', e => { if (e.target === $('monsterView')) closeMonsterView(); });   // клік повз вікно
 
 function selectTower(t) {
   ui.selected = t;
@@ -205,6 +244,10 @@ document.addEventListener('keydown', e => {
   if (confirmState) {   // поки висить питання, інші гарячі клавіші не працюють
     if (e.key === 'Enter' || e.key === 'Escape') { e.preventDefault(); closeConfirm(e.key === 'Enter'); }
     else if (e.key === ' ') e.preventDefault();
+    return;
+  }
+  if (viewState) {   // вікно перегляду: Esc/Enter закривають, решта клавіш не діє
+    if (e.key === 'Escape' || e.key === 'Enter' || e.key === ' ') { e.preventDefault(); closeMonsterView(); }
     return;
   }
   if (e.key === 'Escape') cancelSelection();
@@ -378,63 +421,11 @@ function refreshUpgrade() {
     const maxed = t.level >= MAX_LEVEL;
     $('upName').textContent = def.name;
     $('upLevel').textContent = '◆'.repeat(t.level) + '◇'.repeat(MAX_LEVEL - t.level) + ` ${L('рівень', 'уровень')} ${t.level}/${MAX_LEVEL}`;
-    const now = towerStats(def, t.level);
-    const next = maxed ? null : towerStats(def, t.level + 1);
     const attack = def.attack || 'projectile';
     $('upDesc').textContent = maxed ? `${def.desc}. ${L('Монстр досяг найвищого рівня.', 'Монстр достиг высшего уровня.')}`
-      : `${def.desc}. ${L('Посилення', 'Усиление')}: ${levelGains(attack, now, next)}.`;
+      : `${def.desc}. ${L('Посилення', 'Усиление')}: ${levelGains(attack, towerStats(def, t.level), towerStats(def, t.level + 1))}.`;
 
-    const rows = [];
-    // незмінні з рівнем — однакові в обох колонках
-    const fixed = (label, v) => rows.push([label, v, v]);
-    const stat = (label, f) => rows.push([label, f(now), next && f(next)]);
-    const range = s => s.range.toFixed(2) + ' кл.';
-    if (attack === 'web') {
-      stat(L('Утримання', 'Удержание'), s => s.hold.toFixed(1) + 'с');
-      stat(L('Дальність', 'Дальность'), range);
-      stat('Перезарядка', s => s.rate.toFixed(2) + 'с');
-      fixed('Конус', def.cone + '°');
-    } else if (attack === 'drain') {
-      stat('Урон/с', s => `${Math.round(s.damage)}…${Math.round(s.damageMax)}`);
-      stat(L('Розгін', 'Разгон'), s => (def.ramp * s.rate).toFixed(1) + 'с');
-      stat(L('Цілей', 'Целей'), s => s.targets);
-      stat(L('Дальність', 'Дальность'), range);
-    } else if (attack === 'buff') {
-      stat(L('Зілля', 'Зелье'), s => `+${Math.round(s.buff * 100)}%`);
-      stat('Кому', s => `${s.targets} ${L('випадк.', 'случайн.')} монстр${s.targets === 1 ? 'у' : 'ам'}`);
-    } else if (attack === 'grave') {
-      const need = def.graveEvery(Math.max(1, game.wave));
-      stat(L('Душі', 'Души'), s => `+${s.souls} 👻 за ${need} смертей`);
-      fixed('Смертей', `${t.deaths} / ${need}`);
-      stat(L('Територія', 'Территория'), range);
-    } else if (attack === 'manual') {
-      stat(L('Валуни', 'Валуны'), s => `${Math.min(t.boulders, s.targets)} / ${s.targets}`);
-      stat(L('Відкидання', 'Отбрасывание'), s => s.knock.toFixed(1) + ' кл.');
-      fixed(L('Вибух', 'Взрыв'), `${def.damage} ${L('урону', 'урона')}`);
-      fixed(L('Кидок', 'Бросок'), def.range + ' кл.');
-    } else if (attack === 'haunt') {
-      stat(L('Крихкість', 'Хрупкость'), s => `+${Math.round(s.frail * 100)}% ${L('урону', 'урона')}`);
-      stat(L('Туман', 'Туман'), range);
-      stat(L('Сповільнення невидимих', 'Замедление невидимых'), s => `${Math.round((1 - s.slow) * 100)}%`);
-    } else {
-      stat('Урон', s => Math.round(s.damage));
-      stat(L('Дальність', 'Дальность'), range);
-      stat('Атака', s => s.rate.toFixed(2) + 'с');
-      if (def.splash) stat(attack === 'cleave' ? L('Удар по площі', 'Удар по площади') : L('Вибух', 'Взрыв'), s => +s.splash.toFixed(2) + ' кл.');
-      if (def.splashBig !== undefined) fixed(L('Великим по площі', 'Большим по площади'), def.splashBig ? Math.round(def.splashBig * 100) + L('% урону', '% урона') : L('не зачіпає', 'не задевает'));
-      if (def.minRange) stat(L('Мертва зона', 'Мёртвая зона'), s => `${L('ближче', 'ближе')} ${+s.minRange.toFixed(2)} кл.`);
-      if (def.slow) stat(L('Сповільнення', 'Замедление'), s => `${Math.round((1 - s.slow) * 100)}% · ${def.slowTime}с`);
-      if (def.frail) stat(L('Крихкість', 'Хрупкость'), s => `+${Math.round(s.frail * 100)}% ${L('урону', 'урона')}`);
-      if (def.poison) stat(L('Отрута', 'Яд'), s => `${Math.round(s.poison)}/с · ${def.poisonTime}с`);
-      if (def.chainRange) stat(L('Цілей', 'Целей'), s => s.chain + 1);
-      if (def.chainRange) stat(L('Стрибок', 'Прыжок'), s => s.chainRange.toFixed(1) + ' кл.');
-      if (def.stun) stat(L('Оглушення', 'Оглушение'), s => `${Math.round(s.stunChance * 100)}% · ${def.stun}с`);
-      if (attack === 'beam') fixed(L('Промінь', 'Луч'), def.fixedDir ? L('смуга', 'полоса') : L('крізь усіх', 'сквозь всех'));
-    }
-    if (def.armorPierce) fixed('Броня', L('ігнорує', 'игнорирует'));
-    for (const b of t.buffs) fixed(b.kind === 'rate' ? L('Зілля швидкості', 'Зелье скорости') : L('Зілля сили', 'Зелье силы'), `+${Math.round(b.v * 100)}%`);
-    if (def.detect) fixed(L('Підсвічує невидимих', 'Подсвечивает невидимых'), L('так', 'да'));
-
+    const rows = statRows(def, maxed ? [t.level] : [t.level, t.level + 1], t);
     $('upStats').innerHTML = rows.map(([label, a, b]) => {
       if (maxed) return `<tr><td>${label}</td><td class="max" colspan="3">${a}</td></tr>`;
       const cls = String(a) === String(b) ? 'same' : 'next';
@@ -461,6 +452,65 @@ function refreshUpgrade() {
     up.disabled = game.money < t.upgradeCost;
   }
   $('sellBtn').textContent = `${L('Вигнати', 'Изгнать')} (+👻 ${t.sellValue})`;
+}
+
+// Рядки таблиці характеристик: [назва, значення на levels[0], на levels[1], …].
+// tower — поставлений монстр (валуни, смерті, зілля відьми); без нього — лише характеристики виду.
+function statRows(def, levels, tower = null) {
+  const all = levels.map(l => towerStats(def, l));
+  const attack = def.attack || 'projectile';
+  const rows = [];
+  // незмінні з рівнем — однакові в усіх колонках
+  const fixed = (label, v) => rows.push([label, ...all.map(() => v)]);
+  const stat = (label, f) => rows.push([label, ...all.map(f)]);
+  const range = s => s.range.toFixed(2) + ' кл.';
+  if (attack === 'web') {
+    stat(L('Утримання', 'Удержание'), s => s.hold.toFixed(1) + 'с');
+    stat(L('Дальність', 'Дальность'), range);
+    stat('Перезарядка', s => s.rate.toFixed(2) + 'с');
+    fixed('Конус', def.cone + '°');
+  } else if (attack === 'drain') {
+    stat('Урон/с', s => `${Math.round(s.damage)}…${Math.round(s.damageMax)}`);
+    stat(L('Розгін', 'Разгон'), s => (def.ramp * s.rate).toFixed(1) + 'с');
+    stat(L('Цілей', 'Целей'), s => s.targets);
+    stat(L('Дальність', 'Дальность'), range);
+  } else if (attack === 'buff') {
+    stat(L('Зілля', 'Зелье'), s => `+${Math.round(s.buff * 100)}%`);
+    stat('Кому', s => `${s.targets} ${L('випадк.', 'случайн.')} 👹`);
+  } else if (attack === 'grave') {
+    const need = def.graveEvery(Math.max(1, game.wave));
+    stat(L('Душі', 'Души'), s => `+${s.souls} 👻`);
+    // скільки смертей поруч треба на одну видачу душ (у поставленого — ще й скільки вже набралося)
+    fixed(L('Кількість вбитих', 'Количество убитых'), tower ? `${tower.deaths} / ${need}` : need);
+    stat(L('Територія', 'Территория'), range);
+  } else if (attack === 'manual') {
+    stat(L('Валуни', 'Валуны'), s => tower ? `${Math.min(tower.boulders, s.targets)} / ${s.targets}` : s.targets);
+    stat(L('Відкидання', 'Отбрасывание'), s => s.knock.toFixed(1) + ' кл.');
+    stat('Урон', s => Math.round(s.damage));
+    fixed(L('Кидок', 'Бросок'), def.range + ' кл.');
+  } else if (attack === 'haunt') {
+    stat(L('Крихкість', 'Хрупкость'), s => `+${Math.round(s.frail * 100)}% ${L('урону', 'урона')}`);
+    stat(L('Туман', 'Туман'), range);
+    stat(L('Сповільнення невидимих', 'Замедление невидимых'), s => `${Math.round((1 - s.slow) * 100)}%`);
+  } else {
+    stat('Урон', s => Math.round(s.damage));
+    stat(L('Дальність', 'Дальность'), range);
+    stat('Атака', s => s.rate.toFixed(2) + 'с');
+    if (def.splash) stat(attack === 'cleave' ? L('Удар по площі', 'Удар по площади') : L('Вибух', 'Взрыв'), s => +s.splash.toFixed(2) + ' кл.');
+    if (def.splashBig !== undefined) fixed(L('Великим по площі', 'Большим по площади'), def.splashBig ? Math.round(def.splashBig * 100) + L('% урону', '% урона') : L('не зачіпає', 'не задевает'));
+    if (def.minRange) stat(L('Мертва зона', 'Мёртвая зона'), s => `${L('ближче', 'ближе')} ${+s.minRange.toFixed(2)} кл.`);
+    if (def.slow) stat(L('Сповільнення', 'Замедление'), s => `${Math.round((1 - s.slow) * 100)}% · ${def.slowTime}с`);
+    if (def.frail) stat(L('Крихкість', 'Хрупкость'), s => `+${Math.round(s.frail * 100)}% ${L('урону', 'урона')}`);
+    if (def.poison) stat(L('Отрута', 'Яд'), s => `${Math.round(s.poison)}/с · ${def.poisonTime}с`);
+    if (def.chainRange) stat(L('Цілей', 'Целей'), s => s.chain + 1);
+    if (def.chainRange) stat(L('Стрибок', 'Прыжок'), s => s.chainRange.toFixed(1) + ' кл.');
+    if (def.stun) stat(L('Оглушення', 'Оглушение'), s => `${Math.round(s.stunChance * 100)}% · ${def.stun}с`);
+    if (attack === 'beam') fixed(L('Промінь', 'Луч'), def.fixedDir ? L('смуга', 'полоса') : L('крізь усіх', 'сквозь всех'));
+  }
+  if (def.armorPierce) fixed('Броня', L('ігнорує', 'игнорирует'));
+  if (tower) for (const b of tower.buffs) fixed(b.kind === 'rate' ? L('Зілля швидкості', 'Зелье скорости') : L('Зілля сили', 'Зелье силы'), `+${Math.round(b.v * 100)}%`);
+  if (def.detect) fixed(L('Підсвічує невидимих', 'Подсвечивает невидимых'), L('так', 'да'));
+  return rows;
 }
 
 // ---------- статистика урону за типами монстрів ----------
