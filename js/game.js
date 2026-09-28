@@ -187,19 +187,7 @@ function startWave() {
   if (game.waveActive || game.over || game.wave >= maxWaves()) return;
   game.wave++;
   for (const st of Object.values(game.stats)) st.round = 0;
-  const groups = waveGroups(game.wave);
-  const wb = waveBuff(game.wave);
-  game.spawnQueue = [];
-  let squad = 0;
-  groups.forEach(([type, count, interval, gap, gb, cargo], gi) => {
-    if (gap !== undefined && gi > 0) squad++;   // група з паузою починає новий загін
-    const buff = gb ? mergeBuff(wb, gb) : wb;
-    for (let i = 0; i < count; i++) {
-      // delay — пауза перед появою цього ворога; у продовженні загону пауза = звичайний інтервал
-      const delay = i === 0 ? (gi === 0 ? 0 : gap ?? interval) : interval;
-      game.spawnQueue.push({ type, delay, squad, buff, cargo });
-    }
-  });
+  game.spawnQueue = waveSpawns(game.wave, ROUTE_WEIGHTS);
   game.lastInSquad = [];
   for (const t of game.towers) t.buffs = [];
   for (const t of game.towers) if (t.def.attack === 'buff') brew(t);
@@ -220,6 +208,7 @@ function update(dt) {
       const s = game.spawnQueue.shift();
       game.seen.add(s.type);
       const e = new Enemy(s.type, game.wave, s.buff);
+      e.setRoute(s.route);
       if (s.cargo) e.cargo = s.cargo;                    // вантаж телеги, заданий у набігу
       e.leader = game.lastInSquad[s.squad] || null;   // іде за попереднім у своєму загоні
       game.lastInSquad[s.squad] = e;

@@ -90,6 +90,37 @@ function waveGroups(n) {
 // Баф усього набігу n (для генерованих — порожній).
 const waveBuff = n => WAVES[n] ? WAVES[n].buff : {};
 
+// Шлях загону squad у набігу n: зважений вибір за hash серед weights (ваги шляхів рівня, addPath).
+// Детерміновано, бо панель набігу показує розподіл наперед. Один шлях — завжди 0.
+function routeFor(n, squad, weights) {
+  if (weights.length < 2) return 0;
+  let x = hash(n, squad, 7) * weights.reduce((a, b) => a + b, 0);
+  for (let i = 0; i < weights.length; i++) {
+    x -= weights[i];
+    if (x < 0) return i;
+  }
+  return weights.length - 1;
+}
+
+// Черга появи набігу n: хто, з якою паузою перед появою, у якому загоні, з яким бафом/вантажем і яким шляхом.
+// Спільна для гри (startWave) і панелі набігу, щоб мітки шляхів збігалися з тим, що станеться.
+function waveSpawns(n, weights = [1]) {
+  const wb = waveBuff(n);
+  const out = [];
+  let squad = 0;
+  waveGroups(n).forEach(([type, count, interval, gap, gb, cargo], gi) => {
+    if (gap !== undefined && gi > 0) squad++;   // група з паузою починає новий загін
+    const buff = gb ? mergeBuff(wb, gb) : wb;
+    const route = routeFor(n, squad, weights);
+    for (let i = 0; i < count; i++) {
+      // delay — пауза перед появою цього ворога; у продовженні загону пауза = звичайний інтервал
+      const delay = i === 0 ? (gi === 0 ? 0 : gap ?? interval) : interval;
+      out.push({ type, delay, squad, buff, cargo, route });
+    }
+  });
+  return out;
+}
+
 // Два бафи разом: множники перемножуються.
 function mergeBuff(a, b) {
   const out = { ...a };
