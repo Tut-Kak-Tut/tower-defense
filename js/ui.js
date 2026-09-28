@@ -28,16 +28,15 @@ function foeRow(type) {
 }
 
 // ---------- кнопки веж ----------
-const TOWER_KEYS = '1234567890-=[';   // клавіші вибору монстра за порядком у TOWERS
 const towerTypes = LEVEL ? LEVEL.monsters : Object.keys(TOWERS);   // у рівні — лише його монстри
 const towerButtons = {};
-towerTypes.forEach((type, i) => {
+towerTypes.forEach(type => {
   const def = TOWERS[type];
   const btn = document.createElement('button');
   btn.className = 'tower-btn';
   btn.appendChild(towerIcon(type));
   btn.insertAdjacentHTML('beforeend',
-    `<span class="t-name">${def.name} <kbd>${TOWER_KEYS[i]}</kbd></span>` +
+    `<span class="t-name">${def.name}</span>` +
     `<span class="t-cost">👻 ${def.cost}</span>` +
     `<span class="t-desc">${def.desc}</span>`);
   btn.addEventListener('click', () => selectTowerType(type));
@@ -152,12 +151,13 @@ function closeConfirm(yes) {
 }
 $('confirmYes').addEventListener('click', () => closeConfirm(true));
 $('confirmNo').addEventListener('click', () => closeConfirm(false));
-$('restartBtn').addEventListener('click', () => { newGame(game.mode); cancelSelection(); });
+$('restartBtn').addEventListener('click', () => { deleteSave(saveSlot()); newGame(game.mode); cancelSelection(); });
 $('continueBtn').addEventListener('click', continueEndless);
 const goHome = () => { location.href = 'index.html'; };
 $('menuBtn').addEventListener('click', goHome);
 $('homeBtn').addEventListener('click', () => {
-  if (game.over || game.wave < game.first || confirm(L('Покинути підземелля? Поточна гра не збережеться.', 'Покинуть подземелье? Текущая игра не сохранится.'))) goHome();
+  // між набігами гра вже збережена; посеред набігу сейв — з його початку
+  if (!game.waveActive || confirm(L('Покинути підземелля посеред набігу? Він почнеться заново.', 'Покинуть подземелье посреди набега? Он начнётся заново.'))) goHome();
 });
 
 function toggleAuto() {
@@ -208,9 +208,7 @@ document.addEventListener('keydown', e => {
     else if (e.key === ' ') e.preventDefault();
     return;
   }
-  const ti = e.key.length === 1 ? TOWER_KEYS.indexOf(e.key) : -1;
-  if (ti >= 0 && ti < towerTypes.length) selectTowerType(towerTypes[ti]);
-  else if (e.key === 'Escape') cancelSelection();
+  if (e.key === 'Escape') cancelSelection();
   else if (e.key === ' ') { e.preventDefault(); if (!game.over) game.paused = !game.paused; }
   else if (e.key === 'Enter') { e.preventDefault(); startWave(); }
   else if (e.code === 'KeyA') toggleAuto(); // за кодом клавіші — працює і в українській розкладці
@@ -281,7 +279,7 @@ function enemyTraits(def) {
   if (def.physArmor) t.push(L('броня лише від фізичних ударів', 'броня только от физических ударов'));
   if (def.shieldAura) t.push(L('щит накриває сусідів', 'щит накрывает соседей'));
   if (def.haste) t.push(L('пришвидшує сусідів на ', 'ускоряет соседей на ') + Math.round((def.haste.mul - 1) * 100) + '%');
-  if (def.undying) t.push(L('не гине, поки є союзники', 'не гибнет, пока есть союзники'));
+  if (def.undying) t.push(L('не гине, поки є союзники; монстри б’ють його останнім', 'не гибнет, пока есть союзники; монстры бьют его последним'));
   if (def.magicWard) t.push(L(`магічний щит −${Math.round(def.magicWard.cut * 100)}% магії поруч`, `магический щит −${Math.round(def.magicWard.cut * 100)}% магии рядом`));
   if (def.escort) t.push(L('ходить лише з: ', 'ходит только с: ') + ENEMIES[def.escort].name.toLowerCase());
   if (def.spawn) t.push(L('гинучи, лишає: ', 'погибая, оставляет: ') + ENEMIES[def.spawn].name.toLowerCase());
@@ -320,7 +318,7 @@ function levelGains(attack, now, next) {
   const out = [];
   const add = (key, text) => { if (next[key] !== now[key]) out.push(text(now[key], next[key])); };
   add('damage', (a, b) => (attack === 'drain' ? L('висмоктування ', 'высасывание ') : 'урон ') + (a ? pct(a, b) : `${Math.round(a)} → ${Math.round(b)}`));
-  add('range', (a, b) => `${attack === 'haunt' ? L('туман', 'туман') : L('дальність', 'дальность')} ${signed(b - a)} ${L('кл.', 'кл.')}`);
+  add('range', (a, b) => `${attack === 'haunt' ? L('туман', 'туман') : attack === 'grave' ? L('територія', 'территория') : L('дальність', 'дальность')} ${signed(b - a)} ${L('кл.', 'кл.')}`);
   add('rate', (a, b) => attack === 'drain' ? L(`розгін ${b < a ? 'швидший' : 'повільніший'}`, `разгон ${b < a ? 'быстрее' : 'медленнее'}`)
     : `${attack === 'web' ? L('постріли', 'выстрелы') : 'атака'} на ${Math.round(Math.abs(1 - b / a) * 100)}% ${b < a ? L('частіше', 'чаще') : L('рідше', 'реже')}`);
   add('targets', (a, b) => `${attack === 'manual' ? L('валунів', 'валунов') : L('цілей', 'целей')} ${a} → ${b}`);
@@ -344,7 +342,7 @@ function refreshUpgrade() {
   $('upBody').classList.toggle('hidden', !t);
   if (!t) { upKey = null; upTower = null; return; }
 
-  const key = [t.type, t.level, t.boulders, t.deaths, t.buffs.map(b => b.kind + b.v).join()].join(':');
+  const key = [t.type, t.level, t.boulders, t.deaths, game.wave, t.buffs.map(b => b.kind + b.v).join()].join(':');
   if (t !== upTower || key !== upKey) {
     if (!upTower || upTower.type !== t.type) {
       $('upIcon').textContent = '';
@@ -382,8 +380,10 @@ function refreshUpgrade() {
       stat(L('Зілля', 'Зелье'), s => `+${Math.round(s.buff * 100)}%`);
       stat('Кому', s => `${s.targets} ${L('випадк.', 'случайн.')} монстр${s.targets === 1 ? 'у' : 'ам'}`);
     } else if (attack === 'grave') {
-      stat(L('Душі', 'Души'), s => `+${s.souls} 👻 за ${def.every} смертей`);
-      fixed('Смертей', `${t.deaths} / ${def.every}`);
+      const need = def.graveEvery(Math.max(1, game.wave));
+      stat(L('Душі', 'Души'), s => `+${s.souls} 👻 за ${need} смертей`);
+      fixed('Смертей', `${t.deaths} / ${need}`);
+      stat(L('Територія', 'Территория'), range);
     } else if (attack === 'manual') {
       stat(L('Валуни', 'Валуны'), s => `${Math.min(t.boulders, s.targets)} / ${s.targets}`);
       stat(L('Відкидання', 'Отбрасывание'), s => s.knock.toFixed(1) + ' кл.');
@@ -408,7 +408,6 @@ function refreshUpgrade() {
       if (def.stun) stat(L('Оглушення', 'Оглушение'), s => `${Math.round(s.stunChance * 100)}% · ${def.stun}с`);
       if (attack === 'beam') fixed(L('Промінь', 'Луч'), def.fixedDir ? L('смуга', 'полоса') : L('крізь усіх', 'сквозь всех'));
     }
-    if (def.magic && t.type !== 'lich') fixed(L('Магія', 'Магия'), L('маг послаблює, лати не тримають', 'маг ослабляет, латы не держат'));
     if (def.armorPierce) fixed('Броня', L('ігнорує', 'игнорирует'));
     for (const b of t.buffs) fixed(b.kind === 'rate' ? L('Зілля швидкості', 'Зелье скорости') : L('Зілля сили', 'Зелье силы'), `+${Math.round(b.v * 100)}%`);
     if (def.detect) fixed(L('Підсвічує невидимих', 'Подсвечивает невидимых'), L('так', 'да'));
@@ -545,5 +544,7 @@ function refreshOverlay() {
 // ---------- старт ----------
 // game.html?level=crypt — рівень; ?mode=endless — безкінечний; інакше кампанія (головна сторінка — index.html).
 newGame(LEVEL ? 'level' : DEBUG.get('mode') === 'endless' ? 'endless' : 'campaign');
+restoreSave();
+addEventListener('pagehide', autosave);   // напрям біхолдера, ціль, авто-набіг — зміни без окремого автосейву
 if (LEVEL) { $('title').textContent = LEVEL.name; document.title = `${LEVEL.name} — ${L('Серце Підземелля', 'Сердце Подземелья')}`; }
 requestAnimationFrame(frame);

@@ -458,6 +458,9 @@ const TARGET_MODES = {
   close:  { label: L('Ближній', 'Ближний'), title: L('Найближчий до монстра', 'Ближайший к монстру'),            score: (e, t) => -Math.hypot(e.x - t.x, e.y - t.y) },
 };
 
+// чи пріоритет a ([ранг, score] з Tower.priority) кращий за b
+const betterTarget = (a, b) => a[0] !== b[0] ? a[0] > b[0] : a[1] > b[1];
+
 class Tower {
   constructor(type, col, row) {
     this.type = type;
@@ -525,6 +528,12 @@ class Tower {
     return alive(e) && (!e.hidden || this.def.detect) && !(this.def.attack === 'web' && webProof(e));
   }
 
+  // Пріоритет цілі за фільтром aim; носія прапора (undying) б'ють останнім — лише коли в зоні більше нікого.
+  // Повертає [ранг, score] — порівнювати через betterTarget().
+  priority(e) {
+    return [e.def.undying ? 0 : 1, TARGET_MODES[this.aim].score(e, this)];
+  }
+
   get damage() { return this.stats().damage; }
   get range() { return this.stats().range * CELL; }
   get minRange() { return this.stats().minRange; }  // мертва зона, кл.
@@ -546,13 +555,12 @@ class Tower {
     if (attack === 'drain') { this.drain(game, dt, this.stats()); return; }
     this.cooldown -= dt;
     if (this.cooldown > 0) return;
-    let target = null, best = -Infinity;
-    const score = TARGET_MODES[this.aim].score;
+    let target = null, best = null;
     for (const e of game.enemies) {
       // біхолдер не повертається — стріляє, лише коли хтось на лінії його променя
       if (!this.canHit(e) || !this.reaches(e)) continue;
-      const v = score(e, this);
-      if (v > best) { best = v; target = e; }
+      const v = this.priority(e);
+      if (!best || betterTarget(v, best)) { best = v; target = e; }
     }
     if (!target) return;
     if (!this.def.fixedDir) this.angle = Math.atan2(target.y - this.y, target.x - this.x);
@@ -582,7 +590,9 @@ class Tower {
     }
     if (this.links.size < s.targets) {
       const free = game.enemies.filter(e => !this.links.has(e) && this.canHit(e) && this.reaches(e))
-        .sort((a, b) => TARGET_MODES[this.aim].score(b, this) - TARGET_MODES[this.aim].score(a, this));
+        .map(e => [e, this.priority(e)])
+        .sort((a, b) => betterTarget(a[1], b[1]) ? -1 : betterTarget(b[1], a[1]) ? 1 : 0)
+        .map(([e]) => e);
       for (const e of free.slice(0, s.targets - this.links.size)) this.links.set(e, 0);
     }
     this.rampTime = this.def.ramp * s.rate;

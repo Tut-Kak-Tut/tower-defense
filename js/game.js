@@ -66,6 +66,7 @@ function saveBest(wave) {
 function continueEndless() {
   game.mode = 'endless';
   game.over = null;
+  autosave();
 }
 
 function inBounds(col, row) {
@@ -94,13 +95,15 @@ function placeTower(type, col, row) {
   game.towers.push(t);
   if (!game.stats[type]) game.stats[type] = { round: 0, total: 0, kills: 0 };
   if (t.def.attack === 'buff' && game.waveActive) brew(t);   // відьма, поселена під час набігу, варить одразу
+  autosave();
   return true;
 }
 
-// Кладовище рахує кожну смерть авантюриста (і половинок шута, і воїна вершника); кожна every-та дає душі.
-function graveDeath() {
+// Кладовище рахує смерті авантюристів у своїй території (і половинок шута, і воїна вершника); кожна every-та дає душі.
+function graveDeath(e) {
   for (const t of game.towers) {
-    if (t.def.attack !== 'grave' || ++t.deaths < t.def.every) continue;
+    if (t.def.attack !== 'grave' || !t.reaches(e)) continue;
+    if (++t.deaths < t.def.graveEvery(game.wave)) continue;
     t.deaths = 0;
     const souls = t.stats().souls;
     game.money += souls;
@@ -164,6 +167,7 @@ function upgradeTower(tower) {
   tower.level++;
   // якщо з рівнем валунів більшає (targets у setLevel), орк одразу отримує новий
   if (tower.def.attack === 'manual') tower.boulders += targetsAt(tower.def, tower.level) - targetsAt(tower.def, tower.level - 1);
+  autosave();
   return true;
 }
 
@@ -171,6 +175,7 @@ function sellTower(tower) {
   game.money += tower.sellValue;
   game.towers = game.towers.filter(t => t !== tower);
   for (const t of game.towers) t.buffs = t.buffs.filter(b => b.from !== tower);   // зілля вигнаної відьми вивітрюється
+  autosave();
 }
 
 function startWave() {
@@ -225,7 +230,7 @@ function update(dt) {
 
   const born = [];   // ті, хто з'явився із загиблих (воїн вершника, половинки шута)
   game.enemies = game.enemies.filter(e => {
-    if (e.dead) { game.money += e.reward; graveDeath(); born.push(...e.spawnOnDeath()); return false; }
+    if (e.dead) { game.money += e.reward; graveDeath(e); born.push(...e.spawnOnDeath()); return false; }
     if (e.escaped) { game.lives -= e.lifeDmg; game.heartFlash = 0.5; return false; }
     return true;
   });
@@ -237,6 +242,7 @@ function update(dt) {
   if (game.lives <= 0) {
     game.lives = 0;
     game.over = 'lose';
+    autosave();   // поразка стирає сейв
     return;
   }
 
@@ -253,6 +259,7 @@ function update(dt) {
       game.over = 'win';
       if (game.mode === 'level') markLevelDone(LEVEL.id);
     }
+    autosave();
   }
 }
 

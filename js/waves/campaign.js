@@ -203,7 +203,7 @@ new WaveBuilder(25)
   .squad(2.19).add('fast', 11, 0.39)
   .squad(2.19).add('normal', 9, 0.61)
   .squad(2.19).add('normal', 9, 0.61)
-  .squad(2.19).add('tank', 1, 1.4).add('normal', 5, 0.61).add('banner', 1, 1.2)
+  .squad(2.19).add('tank', 1, 1.4).add('banner', 1, 1.2).add('normal', 5, 0.61)
   .build();
 
 new WaveBuilder(26)

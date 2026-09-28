@@ -52,6 +52,26 @@ function iconRow(label, icons) {
   return row;
 }
 
+// Позначка автосейву на картці: скільки набігів відбито + кнопка «з початку», що стирає сейв.
+function saveBadge(card, slot, first) {
+  const save = loadSave(slot);
+  if (!save) return;
+  const badge = document.createElement('div');
+  badge.className = 'lv-save';
+  badge.textContent = L(`💾 Відбито набігів: ${save.wave - first + 1}`, `💾 Отбито набегов: ${save.wave - first + 1}`);
+  const reset = document.createElement('button');
+  reset.textContent = L('↺ з початку', '↺ сначала');
+  reset.title = L('Стерти збереження', 'Стереть сохранение');
+  reset.addEventListener('click', e => {
+    e.preventDefault();   // кнопка всередині посилання-картки
+    e.stopPropagation();
+    deleteSave(slot);
+    badge.remove();
+  });
+  badge.appendChild(reset);
+  card.appendChild(badge);
+}
+
 const done = loadLevelsDone();
 Object.values(LEVELS).forEach((level, i) => {
   const card = document.createElement('a');
@@ -66,8 +86,12 @@ Object.values(LEVELS).forEach((level, i) => {
     `<span>👻 ${level.money}</span><span>💜 ${level.lives}</span></div>`);
   card.appendChild(iconRow(L('Монстри', 'Монстры'), level.monsters.map(t => [towerIcon(t, 28), TOWERS[t].name])));
   card.appendChild(iconRow(L('Прийдуть', 'Придут'), levelFoes(level).map(t => [enemyIcon(t, 24), ENEMIES[t].name])));
+  saveBadge(card, saveSlotFor(level.id), level.from);
   $('levelList').appendChild(card);
 });
+
+saveBadge(document.querySelector('.free-play a[href="game.html"]'), saveSlotFor(null, false), 1);
+saveBadge(document.querySelector('.free-play a[href="game.html?mode=endless"]'), saveSlotFor(null, true), 1);
 
 const best = loadBest();
 $('bestText').textContent = best ? L(`Рекорд: ${best} набігів.`, `Рекорд: ${best} набегов.`) : '';

@@ -8,7 +8,7 @@ Tower defense у браузері в темі підземелля: гравец
 ## Стек
 HTML5 Canvas + чистий JavaScript, без збірки і залежностей (шрифт Cinzel з Google Fonts, фолбек Georgia).
 Скрипти — звичайні `<script>` (не ES-модулі), щоб працювало з `file://`. Порядок підключення важливий:
-`i18n.js` → `config.js` → `monsters/monster.js` → `monsters/monsters.js` → `adventurers/adventurer.js` → `adventurers/adventurers.js` → `waves/wave.js` → `waves/campaign.js` → `waves/endless.js` → `levels/level.js` → `levels/levels.js` → `entities.js` → `icons.js` → `game.js` → `ui.js` (у `game.html`; `index.html` замість `game.js`/`ui.js` — `home.js`). Усі мають спільну глобальну область видимості.
+`i18n.js` → `config.js` → `monsters/monster.js` → `monsters/monsters.js` → `adventurers/adventurer.js` → `adventurers/adventurers.js` → `waves/wave.js` → `waves/campaign.js` → `waves/endless.js` → `levels/level.js` → `levels/levels.js` → `entities.js` → `icons.js` → `game.js` → `save.js` → `ui.js` (у `game.html`; `index.html` замість `game.js`/`ui.js` — `save.js` → `home.js`). Усі мають спільну глобальну область видимості.
 
 ## Тема ↔ код
 Код лишився з TD-назвами: `Tower` = монстр, `Enemy` = авантюрист, `money` = душі, `lives` = міцність Серця,
@@ -41,13 +41,17 @@ HTML5 Canvas + чистий JavaScript, без збірки і залежнос�
 - `js/levels/level.js` — `LevelBuilder` (`setWaves(from, to)` — відрізок набігів кампанії, `setMoney`, `setLives`, `setMonsters`, `setMap(path, torches)`)
   → реєстр `LEVELS`; `build()` перевіряє монстрів і коридор (від col −1 до `COLS`, прямі відрізки, без самоперетинів). Пройдені — `markLevelDone` у `localStorage`.
 - `js/levels/levels.js` — самі рівні; порядок = порядок карток на головній. Стартові душі — ≈ дохід кампанії до першого набігу рівня.
+- `js/save.js` — автосейв у `localStorage`, слот на вхід (`saveSlotFor`: `campaign` / `endless` / `level-<id>`). Пишемо лише між набігами
+  (`autosave()` після зачистки, поселення/посилення/продажу, на `pagehide`), тож посеред набігу знімок не потрібен — продовження з його початку.
+  Поразка/пройдений рівень/«Грати знову» стирають сейв; відладка `?wave=`/`?money=` сейв не чіпає. Нове поле монстра/`game`, що живе
+  між набігами, — додати в `snapshot()` і `restoreSave()`; несумісна зміна формату — підняти `SAVE_VERSION`.
 - `js/home.js` — головна (`index.html`): картки рівнів (мініатюра мапи, монстри, авантюристи з `waveGroups`) і вільна гра.
 - `js/icons.js` — `towerIcon`/`enemyIcon` (спільні для гри й головної).
 - `js/entities.js` — поточний рівень `LEVEL` (з `?level=`) і мапа `PATH_POINTS`/`TORCHES` (рівня або стандартна); `towerStats(def, level)` (усі характеристики на рівні — і для гри, і для UI; `Tower.stats()` — те саме
   з бафами відьми `tower.buffs`, у грі брати його), `targetsAt()` (цілі/валуни на рівні), `Enemy`
   (`setProgress(p)` ставить на будь-яке місце шляху за `PATH_LEN`; `spawnOnDeath()` — воїн вершника, половинки шута,
   їм ставиться `summoned` і `origin` — панель набігу рахує за `origin`; `speed` — з прискоренням носія прапора `hasted`;
-  носій прапора `undying` не падає нижче 1 HP, поки живий хтось не-`undying` (`hasGuards`); щит паладина `shieldAura`
+  носій прапора `undying` не падає нижче 1 HP, поки живий хтось не-`undying` (`hasGuards`), і монстри цілять його останнім (`Tower.priority` / `betterTarget`); щит паладина `shieldAura`
   поглинає урон і по сусідах (`shieldGuards`); `magicWard` мага ріже магічний урон (`TOWERS[src].magic`) поруч;
   броня `physArmor` (гном) не діє проти магії; `Tower.canHit(e)` — хто кого взагалі може цілити; `Tower.aim` — фільтр цілі з `TARGET_MODES` (перший/останній/сильний/слабкий/ближній), `Tower.aims` — чи монстр сам обирає ціль),
   (броня/щит/отрута/лікування/оглушення/невидимість через `hidden`/`revealed`), `Tower` (атаки `projectile`/`aura`/`beam`/`web` — павук раз на `rate` стріляє павутиною в конус `cone` перед собою — усі в ньому стоять `hold` с через `stun(t, webbed)` (кокон замість зірочок, ефект `cone`), без урону; з рівнем ростуть утримання, дальність і частота,
@@ -60,7 +64,7 @@ HTML5 Canvas + чистий JavaScript, без збірки і залежнос�
   (скидає бафи й варить нові — `brew()`), `update(dt)` (після набігу орк отримує валун), рекорд, `canAfford` (душі, ліміт,
   `unique`), `throwBoulder`, `newTower` (біхолдер/орк одразу дивляться за `bestDir`);
   малювання: `buildMapLayer()` (кеш), факели, Серце, віньєтка, `drawEffect` (ефекти за `kind`: beam/bolt/quake/кола); цикл `frame`.
-- `js/ui.js` — об'єкт `ui` (placing/selected/hover/tab), події миші й клавіатури (монстри — `towerTypes`, у рівні лише його; клавіші `TOWER_KEYS` 1…9, 0, -, =, [;
+- `js/ui.js` — об'єкт `ui` (placing/selected/hover/tab), події миші й клавіатури (монстри — `towerTypes`, у рівні лише його; вибір монстра — лише кліком;
   подвійний клік по орку — кидок), `refreshUI()` кожен кадр, `refreshOverlay()` (кінець гри), старт гри за URL; 🏠 — на головну.
   Розкладка: зліва панель набігу (`refreshRaid`) і бестіарій (`refreshBestiary`, за `game.seen` — хто вже з'являвся за цю гру);
   центр — canvas; справа вкладки «Монстри» / «Посилення» (`refreshUpgrade`, «зараз → після» через `towerStats()`).

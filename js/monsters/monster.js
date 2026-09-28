@@ -15,8 +15,10 @@ const LEVEL_STATS = ['damage', 'damageMax', 'range', 'rate', 'targets', 'hold', 
 //   buff — відьма: перед набігом бафає двох випадкових атакуючих монстрів на buff (одному частоту, другому урон);
 //   manual — орк: сам не атакує, гравець подвійним кліком кидає валун (див. Boulder);
 //   web — павук раз на rate с стріляє павутиною в конус cone°: усі в ньому стоять hold с (бос — вдвічі менше);
-//   grave — кладовище: сам не атакує, кожна every-та смерть авантюриста на мапі дає souls душ.
+//   grave — кладовище: сам не атакує, кожна every-та смерть авантюриста в range кл. від нього дає souls душ;
+//           every росте на 1 кожні everyGrow набігів (Monster.graveEvery).
 const ATTACKS = ['projectile', 'aura', 'beam', 'haunt', 'drain', 'cleave', 'buff', 'manual', 'web', 'grave'];
+
 
 class Monster {
   // Створює лише MonsterBuilder.build(): params — усі поля, levels — { стат: [значення на рівнях 1…MAX_LEVEL],
@@ -25,6 +27,11 @@ class Monster {
     this.id = id;
     Object.assign(this, params);
     this.levels = levels;
+  }
+
+  // кладовище: скільки смертей треба на набігу wave
+  graveEvery(wave) {
+    return this.every + Math.floor(Math.max(0, wave - 1) / this.everyGrow);
   }
 }
 
@@ -73,7 +80,9 @@ class MonsterBuilder {
   setDrain(dmgMax, rampSeconds) { this.set('damageMax', dmgMax); return this.set('ramp', rampSeconds); } // вампір
   setBuff(part) { return this.set('buff', part); }                  // котел відьми
   setKnock(cells) { return this.set('knock', cells); }              // валун орка
-  setSouls(souls, every) { this.set('souls', souls); return this.set('every', every); } // кладовище: souls душ за кожні every смертей
+  setSouls(souls, every, growWaves) { // кладовище: souls душ за кожні every смертей, every +1 кожні growWaves набігів
+    this.set('souls', souls); this.set('every', every); return this.set('everyGrow', growWaves);
+  }
 
   // Що змінюється на рівні level (2…MAX_LEVEL): { upgradeCost, damage, range, ... }.
   // Чого не вказано — лишається як на попередньому рівні.

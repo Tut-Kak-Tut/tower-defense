@@ -24,9 +24,8 @@ body {
   font-family: Georgia, "Times New Roman", serif;
 }
 
-/* праворуч без відступу — колонка статистики може доходити до краю екрана */
-#app { margin: 0 auto; padding: 16px 0 16px 16px; }
-#hud { padding-right: 16px; }
+/* праворуч той самий відступ, що й у кнопки мови (16px) — і статистика, і кнопки HUD рівняються по ньому */
+#app { margin: 0 auto; padding: 16px; }
 
 #hud {
   display: flex;
@@ -58,14 +57,13 @@ body {
 
 main {
   display: grid;
-  grid-template-columns: 240px minmax(0, 800px) 340px 220px;
+  /* праві колонки (монстри/посилення і статистика) забирають решту ширини до краю — 75% / 25% */
+  grid-template-columns: 240px minmax(0, 800px) minmax(480px, 3fr) minmax(160px, 1fr);
   gap: 16px;
   align-items: start;
   justify-content: center;
 }
-@media (max-width: 1680px) {
-  #app { padding-right: 16px; }
-  #hud { padding-right: 0; }
+@media (max-width: 1760px) {
   /* поле зверху на всю ширину, бічні колонки — під ним */
   main { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   #board { grid-column: 1 / -1; justify-self: center; }
@@ -226,6 +224,7 @@ button.tab.active {
 /* ---------- статистика урону ---------- */
 #statsPanel {
   min-width: 0;
+  align-self: stretch;   /* на всю висоту ряду, а не лише під вміст */
   background: linear-gradient(var(--stone-hi), var(--stone));
   border: 1px solid var(--stone-edge);
   box-shadow: inset 0 1px 0 rgba(255,255,255,0.05), 0 4px 12px rgba(0,0,0,0.5);
@@ -373,6 +372,9 @@ kbd {
 .lv-done { color: #9fd89a; }
 .lv-map { width: 100%; height: auto; border-radius: 5px; border: 1px solid var(--stone-edge); image-rendering: pixelated; }
 .lv-meta { display: flex; gap: 14px; font-size: 14px; }
+.lv-save { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 14px; color: #9dc4ff; }
+.lv-save button { font: inherit; font-size: 13px; padding: 2px 8px; cursor: pointer; color: var(--muted); background: transparent; border: 1px solid currentColor; border-radius: 4px; }
+.lv-save button:hover { color: var(--crimson-hi); }
 .lv-icons { display: flex; flex-wrap: wrap; align-items: center; gap: 2px; }
 .lv-label { color: var(--muted); font-size: 12px; width: 64px; }
 .level-card.free { justify-content: center; min-height: 110px; }
