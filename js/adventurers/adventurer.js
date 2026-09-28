@@ -83,7 +83,8 @@ class AdventurerBuilder {
   setMagicWard(radiusCells, cut) { return this.set('magicWard', { radius: radiusCells, cut }); } // магічний урон по всіх поруч (і по собі) × (1 − cut)
   setEscort(type) { return this.set('escort', type); }             // у набігах іде лише в загоні, де є type (перевіряють WaveBuilder і EndlessBuilder)
   setHeal(radiusCells, part, everySec) { return this.set('heal', { radius: radiusCells, amount: part, every: everySec }); } // лікує себе й сусідів
-  setSpawnOnDeath(type) { return this.set('spawn', type); }         // хто з'являється позаду, коли цей гине (оголосити раніше)
+  setSpawnOnDeath(types) { return this.set('spawn', [].concat(types)); } // хто з'являється позаду, коли цей гине: тип або список типів (оголосити раніше)
+  setFatal(on = true) { return this.set('fatal', on); }            // дійшов до Серця — одразу поразка
   setSplit(times, rewardEach) {                                     // гинучи, ділиться на двох з половиною HP, times разів;
     this.set('split', times);                                       // душі дають лише останні (rewardEach кожен)
     return this.set('splitReward', rewardEach);
@@ -102,7 +103,7 @@ class AdventurerBuilder {
       fail(`набіг появи ${this.unlock} кратний 5 — там тематичні й бос-набіги, новачок не потрапить першим`);
     }
     if (p.escort && !ENEMIES[p.escort]) fail(`setEscort('${p.escort}'): такого авантюриста ще не оголошено вище`);
-    if (p.spawn && !ENEMIES[p.spawn]) fail(`setSpawnOnDeath('${p.spawn}'): такого авантюриста ще не оголошено вище`);
+    for (const t of p.spawn || []) if (!ENEMIES[t]) fail(`setSpawnOnDeath('${t}'): такого авантюриста ще не оголошено вище`);
 
     for (const [n, stats] of Object.entries(this.waves)) {
       if (!(n >= 2)) fail(`setWave(${n}): набіг має бути від 2 (набіг 1 — це setHp/setSpeed/...)`);

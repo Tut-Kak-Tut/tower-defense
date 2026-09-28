@@ -1,7 +1,8 @@
 // Набіги: будівельник набігу (WaveBuilder) і те, як гра дізнається склад і силу набігу n.
 // Кампанія — у campaign.js (ця ж папка), безкінечний режим після неї — у endless.js.
 
-// Набіг — список груп [тип, кількість, інтервал між ворогами (с), пауза?, баф?]. Групи йдуть одна за одною.
+// Набіг — список груп [тип, кількість, інтервал між ворогами (с), пауза?, баф?, вантаж?]. Групи йдуть одна за одною.
+// Вантаж (.cargo) — хто висипає з кожного авантюриста групи, коли той гине (замість його setSpawnOnDeath).
 // Група з паузою починає новий загін; група без паузи — продовження загону одразу за попередньою.
 // У загоні ніхто не обганяє того, хто йде попереду (Enemy.leader), тож стрій тримається: авангард веде решту.
 const WAVES = {};   // номер набігу → { groups, buff }; заповнює WaveBuilder.build()
@@ -27,6 +28,15 @@ class WaveBuilder {
     return this;
   }
 
+  // Хто висипає з авантюристів попередньої групи, коли ті гинуть, — замість їхнього setSpawnOnDeath.
+  // Приклад: .add('wagon', 1, 1.3).cargo(['knight', 'knight', 'priest'])
+  cargo(types) {
+    const g = this.groups[this.groups.length - 1];
+    if (!g) throw new Error(`Набіг ${this.n}: .cargo() — лише після .add()`);
+    g[5] = types;
+    return this;
+  }
+
   // Баф для всіх у цьому набігу: { hp, speed, reward, armor } — множники.
   buff(stats) { this.waveBuff = { ...this.waveBuff, ...stats }; return this; }
 
@@ -43,9 +53,13 @@ class WaveBuilder {
       }
     };
     checkBuff(this.waveBuff, 'buff');
-    this.groups.forEach(([type, count, interval, , buff], i) => {
+    this.groups.forEach(([type, count, interval, , buff, cargo], i) => {
       const where = `група ${i + 1} ('${type}')`;
       if (!ENEMIES[type]) fail(`${where}: такого авантюриста немає`);
+      if (cargo) {
+        if (!Array.isArray(cargo) || !cargo.length) fail(`${where}: cargo — непорожній список типів`);
+        for (const t of cargo) if (!ENEMIES[t]) fail(`${where}: cargo — авантюриста '${t}' немає`);
+      }
       if (!(Number.isInteger(count) && count >= 1)) fail(`${where}: кількість — ціле число від 1`);
       if (!(interval >= 0)) fail(`${where}: інтервал — число від 0`);
       if (buff) checkBuff(buff, where);

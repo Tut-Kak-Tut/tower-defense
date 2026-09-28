@@ -15,7 +15,8 @@ HTML5 Canvas + чистий JavaScript, без збірки і залежнос�
 `wave` = набіг. Монстри: `archer` скелет-лучник, `cannon` вогняний імп, `frost` привид, `spider` павук,
 `golem` голем, `lich` лич, `eye` біхолдер, `slime` слаймо-пулька, `vampire` вампір, `plate` живі лати, `witch` котел відьми,
 `orc` орк-швиряка, `grave` кладовище. Авантюристи: `normal` воїн, `fast` злодій, `tank` паладин, `gnome` гном,
-`banner` носій прапора, `priest` жрець, `mage` маг, `scout` розвідник, `knight` вершник, `jester` шут, `blade` майстер меча, `hero` герой-бос.
+`banner` носій прапора, `priest` жрець, `mage` маг, `scout` розвідник, `knight` вершник, `jester` шут, `blade` майстер меча, `hero` герой-бос,
+`wagon` телега авантюристів (дуже повільна й міцна, `setSpawnOnDeath([...])` — висипає загін, `setFatal` — дійшла до Серця = поразка).
 
 ## Структура
 - `js/i18n.js` — мова (укр/рос, `LANG` з `localStorage`): `L('укр', 'рос')` у коді, `data-ru`/`data-ru-title` у HTML, кнопка RU/UA у правому верхньому куті; перемикання перезавантажує сторінку.
@@ -32,9 +33,9 @@ HTML5 Canvas + чистий JavaScript, без збірки і залежнос�
 - `js/adventurers/adventurers.js` — самі авантюристи ланцюжками `new AdventurerBuilder(id)…build()`; порядок = порядок на головній (картки рівнів).
   Сила з набігами — опорні точки `setWave(n, {hp, speed, reward, armor, splitReward})`: між ними лінійно, після останньої —
   тим самим темпом (`Adventurer.statsAt(n)`); точки згенеровані зі старої кривої HP `1 + 0.12(n−1) + 0.0019(n−1)²`.
-- `js/waves/wave.js` — `WaveBuilder` (`.squad(пауза).add(тип, к-сть, інтервал, баф?)`, `.buff({hp, speed, reward, armor})`) → реєстр `WAVES`;
+- `js/waves/wave.js` — `WaveBuilder` (`.squad(пауза).add(тип, к-сть, інтервал, баф?)`, `.cargo([типи])` — вантаж попередньої групи (хто висипає при смерті, замість `setSpawnOnDeath`; → `Enemy.cargo`), `.buff({hp, speed, reward, armor})`) → реєстр `WAVES`;
   `waveGroups(n)` (з `WAVES`, інакше генератор безкінечного), `waveBuff(n)`, `mergeBuff`, `adventurerStats(type, n, buff)` — сила для `Enemy`.
-  Група набігу — `[тип, кількість, інтервал, пауза?, баф?]`: група з паузою починає новий загін; у загоні ніхто не обганяє
+  Група набігу — `[тип, кількість, інтервал, пауза?, баф?, вантаж?]`: група з паузою починає новий загін; у загоні ніхто не обганяє
   попереднього (`Enemy.leader`, `FORMATION_GAP`), тож стрій «авангард → основа → тил» тримається.
 - `js/waves/campaign.js` — усі 100 набігів кампанії ланцюжками `WaveBuilder` (згенеровані зі старого генератора, далі — вручну).
 - `js/waves/endless.js` — безкінечний: `EndlessBuilder` (ріст HP і броні після кампанії `setHpGrowth`, бос/тематичний кожні N, бюджет

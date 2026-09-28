@@ -186,13 +186,13 @@ function startWave() {
   const wb = waveBuff(game.wave);
   game.spawnQueue = [];
   let squad = 0;
-  groups.forEach(([type, count, interval, gap, gb], gi) => {
+  groups.forEach(([type, count, interval, gap, gb, cargo], gi) => {
     if (gap !== undefined && gi > 0) squad++;   // група з паузою починає новий загін
     const buff = gb ? mergeBuff(wb, gb) : wb;
     for (let i = 0; i < count; i++) {
       // delay — пауза перед появою цього ворога; у продовженні загону пауза = звичайний інтервал
       const delay = i === 0 ? (gi === 0 ? 0 : gap ?? interval) : interval;
-      game.spawnQueue.push({ type, delay, squad, buff });
+      game.spawnQueue.push({ type, delay, squad, buff, cargo });
     }
   });
   game.lastInSquad = [];
@@ -215,6 +215,7 @@ function update(dt) {
       const s = game.spawnQueue.shift();
       game.seen.add(s.type);
       const e = new Enemy(s.type, game.wave, s.buff);
+      if (s.cargo) e.cargo = s.cargo;                    // вантаж телеги, заданий у набігу
       e.leader = game.lastInSquad[s.squad] || null;   // іде за попереднім у своєму загоні
       game.lastInSquad[s.squad] = e;
       game.enemies.push(e);
@@ -231,7 +232,7 @@ function update(dt) {
   const born = [];   // ті, хто з'явився із загиблих (воїн вершника, половинки шута)
   game.enemies = game.enemies.filter(e => {
     if (e.dead) { game.money += e.reward; graveDeath(e); born.push(...e.spawnOnDeath()); return false; }
-    if (e.escaped) { game.lives -= e.lifeDmg; game.heartFlash = 0.5; return false; }
+    if (e.escaped) { game.lives -= e.def.fatal ? game.lives : e.lifeDmg; game.heartFlash = 0.5; return false; }   // телега — одразу поразка
     return true;
   });
   for (const e of born) game.seen.add(e.type);

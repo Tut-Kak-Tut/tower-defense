@@ -130,7 +130,7 @@ class Endless {
 // «Загроза» авантюриста: HP × швидкість (відносно воїна) × удар по Серцю — швидких і вершників у набігу менше.
 // шут із нащадками має втричі більше сумарного HP (1 + 2×½ + 4×¼)
 const threat = t => ENEMIES[t].hp * ENEMIES[t].speed / 60 * (ENEMIES[t].lifeDmg || 1) * ((ENEMIES[t].split || 0) + 1)
-  + (ENEMIES[t].spawn ? threat(ENEMIES[t].spawn) : 0);
+  + (ENEMIES[t].spawn || []).reduce((m, u) => m + threat(u), 0);
 const squadMass = s => s.units.reduce((m, [t, c]) => m + threat(t) * c * (ENEMIES[t].countMul || 1), 0);
 
 const ENDLESS = new EndlessBuilder()
@@ -157,6 +157,7 @@ const ENDLESS = new EndlessBuilder()
   .addSquad('Легендарний загін', [['knight', 1], ['tank', 1], ['blade', 2], ['jester', 1], ['priest', 1]])
   .addSquad('Штандарт', [['normal', 3], ['banner', 1]])
   .addSquad('Прапор над походом', [['tank', 1], ['normal', 2], ['banner', 1], ['priest', 1]])
+  .addSquad('Обоз', [['tank', 1], ['wagon', 1], ['normal', 2]])
   .build();
 
 checkCampaign();

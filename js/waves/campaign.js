@@ -15,11 +15,14 @@
 //   .add(хто, скільки, інтервал, баф?) — група в поточному загоні:
 //                    хто       — id авантюриста: 'normal' воїн, 'fast' злодій, 'tank' паладин, 'gnome' гном,
 //                                'priest' жрець, 'mage' маг, 'scout' розвідник, 'knight' вершник, 'jester' шут,
-//                                'blade' майстер меча, 'hero' герой-бос (усі — у js/adventurers/adventurers.js);
+//                                'blade' майстер меча, 'hero' герой-бос, 'wagon' телега (усі — у js/adventurers/adventurers.js);
 //                    скільки   — ціле число від 1;
 //                    інтервал  — секунди між появою авантюристів цієї групи.
 //                    Кілька add в одному загоні йдуть одна за одною без паузи. У загоні ніхто не обганяє того, хто
 //                    попереду, тож порядок add = стрій: спершу авангард (паладин/гном/вершник), далі основа, в кінці тил (жрець/маг).
+//   .cargo([хто, хто, …]) — після .add: хто висипає з кожного авантюриста цієї групи, коли той гине
+//                    (замість його звичайного; телега без .cargo везе 3 воїнів, 2 злодіїв і гнома).
+//                    Приклад: .add('wagon', 1, 1.3).cargo(['knight', 'knight', 'priest'])
 //   .buff({ hp, speed, reward, armor }) — множники: { hp: 1.5 } — +50% здоров'я, { reward: 2 } — удвічі більше душ.
 //                    Баф набігу й баф групи перемножуються. Воїн, що лишається після вершника, успадковує баф вершника.
 //
@@ -432,6 +435,7 @@ new WaveBuilder(45)
   .squad(1.94).add('normal', 12, 0.54)
   .squad(1.94).add('tank', 1, 1.24).add('normal', 9, 0.54)
   .squad(1.94).add('fast', 14, 0.35)
+  .squad(2.5).add('wagon', 1, 1)
   .build();
 
 new WaveBuilder(46)
@@ -684,6 +688,7 @@ new WaveBuilder(70)
   .squad(1.62).add('knight', 3, 0.78).add('tank', 1, 1.3).add('hero', 2, 1.3).add('priest', 2, 0.65)
   .squad(1.62).add('scout', 8, 0.39)
   .squad(1.62).add('normal', 11, 0.45).add('banner', 1, 1.2)
+  .squad(2.5).add('tank', 1, 1).add('wagon', 1, 1.3).cargo(['knight', 'normal', 'normal', 'normal', 'priest', 'mage']).add('priest', 1, 1)
   .build();
 
 new WaveBuilder(71)
@@ -871,6 +876,7 @@ new WaveBuilder(90)
   .squad(1.38).add('knight', 3, 0.66).add('tank', 1, 1.1).add('hero', 2, 1.1).add('priest', 2, 0.55)
   .squad(1.38).add('scout', 9, 0.33)
   .squad(1.38).add('normal', 12, 0.39).add('banner', 1, 1.2)
+  .squad(2.5).add('knight', 2, 0.8).add('tank', 1, 1).add('wagon', 1, 1.3).cargo(['knight', 'knight', 'blade', 'blade', 'gnome', 'gnome', 'scout', 'scout']).add('mage', 1, 0.8).add('priest', 1, 0.8)
   .build();
 
 new WaveBuilder(91)

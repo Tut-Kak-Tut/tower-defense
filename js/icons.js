@@ -21,8 +21,8 @@ function towerIcon(type, size = 32) {
 function enemyIcon(type, size = 32) {
   const def = ENEMIES[type];
   return makeIcon(size, g => {
-    // усі авантюристи однакового розміру в іконці; вершник із конем і списом довший за радіус
-    const k = size * 0.36 / def.radius / (type === 'knight' ? 1.5 : 1);
+    // усі авантюристи однакового розміру в іконці; вершник із конем і списом, телега з конем довші за радіус
+    const k = size * 0.36 / def.radius / (type === 'knight' ? 1.5 : type === 'wagon' ? 2.1 : 1);
     g.scale(k, k);
     g.rotate(-Math.PI / 2);
     drawAdventurer(g, type, def.radius, def.color);

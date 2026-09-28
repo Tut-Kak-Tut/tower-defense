@@ -101,6 +101,7 @@ class Enemy {
     this.guarded = false;  // носій прапора зараз безсмертний (є союзники) — для малювання
     this.summoned = false; // з'явився з іншого авантюриста, а не з черги набігу
     this.gen = 0;          // покоління шута: 0 — цілий, def.split — найменші
+    this.cargo = null;     // хто висипає при смерті, якщо набіг задав свій вантаж (.cargo), інакше — def.spawn
     this.poisonDps = 0;
     this.poisonTimer = 0;
     this.poisonSrc = null; // чия отрута — для статистики
@@ -226,7 +227,8 @@ class Enemy {
       out.push(e);
       return e;
     };
-    if (this.def.spawn) make(this.def.spawn, this.progress - CELL);
+    // вершник лишає одного воїна; з телеги висипає ціла колона позаду неї
+    (this.cargo || this.def.spawn || []).forEach((type, i) => make(type, this.progress - CELL - i * CELL * 0.6));
     if (this.def.split && this.gen < this.def.split) {
       // шут розпадається на двох з половиною здоров'я; душі — лише за найменших
       for (const off of [-8, 8]) {
@@ -907,6 +909,50 @@ function drawAdventurer(ctx, type, r, color) {
       ctx.fill();
       ctx.restore();
       ellipse(r * 0.1, 0, r * 0.2, r * 0.2, '#f0d8a8', false);
+      break;
+    }
+
+    case 'wagon': {
+      // кінь у запрягу попереду: голоблі, тулуб, голова
+      ctx.fillStyle = '#6b4a2b';
+      for (const side of [-1, 1]) ctx.fillRect(r * 0.8, side * r * 0.35 - 1, r * 0.9, 2);
+      ellipse(r * 1.35, 0, r * 0.5, r * 0.26, '#5a3a22');
+      ellipse(r * 1.9, 0, r * 0.2, r * 0.13, '#4a2f1b');
+      // колеса з боків: спиці біжать, поки віз котиться
+      const roll = (time * 3) % 1;
+      for (const wx of [-r * 0.55, r * 0.5]) {
+        for (const side of [-1, 1]) {
+          const wy = side * r * 0.72;
+          ctx.fillStyle = '#3a2618';
+          ctx.fillRect(wx - r * 0.3, wy - 2.5, r * 0.6, 5);
+          ctx.fillStyle = '#8a6a3a';
+          for (let k = 0; k < 3; k++) ctx.fillRect(wx - r * 0.3 + ((k / 3 + roll) % 1) * r * 0.6, wy - 2.5, 1.5, 5);
+        }
+      }
+      // дерев'яний кузов із дошками
+      ctx.beginPath();
+      ctx.rect(-r * 0.95, -r * 0.62, r * 1.8, r * 1.24);
+      ctx.fillStyle = '#7a5230';
+      ctx.fill();
+      outline();
+      ctx.strokeStyle = 'rgba(0,0,0,0.3)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      for (const dy of [-0.2, 0.2]) { ctx.moveTo(-r * 0.95, r * dy); ctx.lineTo(r * 0.85, r * dy); }
+      ctx.stroke();
+      // полотняний тент дугами, ззаду — шоломи тих, хто всередині
+      ctx.beginPath();
+      ctx.rect(-r * 0.55, -r * 0.55, r * 1.3, r * 1.1);
+      ctx.fillStyle = '#d8ccb0';
+      ctx.fill();
+      outline();
+      ctx.strokeStyle = 'rgba(90,70,40,0.5)';
+      ctx.beginPath();
+      for (const dx of [-0.2, 0.15, 0.5]) { ctx.moveTo(r * dx, -r * 0.55); ctx.lineTo(r * dx, r * 0.55); }
+      ctx.stroke();
+      for (const [hx, hy, hc] of [[-0.75, -0.3, '#8e98a6'], [-0.78, 0.05, '#2e4a2b'], [-0.72, 0.35, '#8e98a6']]) {
+        ellipse(r * hx, r * hy + Math.sin(time * 5 + hy * 9) * 0.8, r * 0.17, r * 0.17, hc);
+      }
       break;
     }
 

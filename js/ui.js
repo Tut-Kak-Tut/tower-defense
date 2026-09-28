@@ -266,14 +266,15 @@ function refreshRaid() {
       r.row.classList.toggle('done', left === 0);
     } else {
       r.count.textContent = `×${r.total}`;
-      r.sub.textContent = ENEMIES[type].desc;
+      r.sub.textContent = '';   // опис — лише в картці при наведенні
     }
   }
 }
 
 // ---------- картка авантюриста (підказка над рядком набігу) ----------
 // Особливості авантюриста списком: «щит 50%», «не мерзне», …  (броня — окремо, з сили на набігу)
-function enemyTraits(def) {
+// cargo — вантаж, заданий набігом (.cargo), замість def.spawn
+function enemyTraits(def, cargo = def.spawn) {
   const t = [];
   if (def.shield) t.push(`щит ${Math.round(def.shield * 100)}%${def.shieldRegen ? L(' (відновлюється)', ' (восстанавливается)') : ''}${def.shieldWave ? L(` з ${def.shieldWave}-го набігу`, ` с ${def.shieldWave}-го набега`) : ''}`);
   if (def.slowImmune) t.push(L('не мерзне', 'не мёрзнет'));
@@ -284,13 +285,19 @@ function enemyTraits(def) {
   if (def.magicWard) t.push(def.magicWard.cut >= 1 ? L('магія не діє на нього й тих, хто поруч', 'магия не действует на него и тех, кто рядом')
     : L(`магічний щит −${Math.round(def.magicWard.cut * 100)}% магії поруч`, `магический щит −${Math.round(def.magicWard.cut * 100)}% магии рядом`));
   if (def.escort) t.push(L('ходить лише з: ', 'ходит только с: ') + ENEMIES[def.escort].name.toLowerCase());
-  if (def.spawn) t.push(L('гинучи, лишає: ', 'погибая, оставляет: ') + ENEMIES[def.spawn].name.toLowerCase());
+  if (cargo) {
+    const n = {};
+    for (const u of cargo) n[u] = (n[u] || 0) + 1;
+    t.push(L('гинучи, лишає: ', 'погибая, оставляет: ') +
+      Object.entries(n).map(([u, c]) => ENEMIES[u].name.toLowerCase() + (c > 1 ? ` ×${c}` : '')).join(', '));
+  }
   if (def.split) t.push(L(`ділиться ${def.split} рази`, `делится ${def.split} раза`));
   if (def.deflect) t.push(L(`відбиває ${Math.round(def.deflect * 100)}% снарядів`, `отражает ${Math.round(def.deflect * 100)}% снарядов`));
   if (def.big) t.push(L('великий', 'большой'));
   if (def.heal) t.push(L('лікує', 'лечит'));
   if (def.stealth) t.push(L('невидимий', 'невидимый'));
-  if (def.lifeDmg) t.push(L('Серцю −', 'Сердцу −') + def.lifeDmg);
+  if (def.fatal) t.push(L('дійде до Серця — поразка', 'дойдёт до Сердца — поражение'));
+  else if (def.lifeDmg) t.push(L('Серцю −', 'Сердцу −') + def.lifeDmg);
   return t;
 }
 
@@ -305,7 +312,8 @@ function showFoeTip(type, n, row) {
   const s = adventurerStats(type, n, waveBuff(n));
   // шут дає душі лише за найменших — показуємо суму за всю родину
   const reward = Math.round(def.split ? s.splitReward * 2 ** def.split : s.reward);
-  const traits = enemyTraits(def);
+  const group = waveGroups(n).find(g => g[0] === type && g[5]);   // набіг міг задати свій вантаж
+  const traits = enemyTraits(def, group ? group[5] : def.spawn);
   foeTip.innerHTML =
     `<div class="ft-head"><b>${def.name}</b><span>👻 ${reward}</span></div>` +
     `<p>${def.desc}</p>` +

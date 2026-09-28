@@ -138,7 +138,7 @@ h3 {
 /* ---------- рядки ворогів (панель набігу) ---------- */
 .foe {
   display: grid;
-  grid-template-columns: 34px 1fr auto;
+  grid-template-columns: 34px minmax(0, 1fr) auto;   /* довга назва переноситься, а не виштовхує кількість */
   column-gap: 8px;
   align-items: center;
   padding: 5px 6px;
@@ -155,17 +155,22 @@ h3 {
   box-shadow: inset 0 0 0 1px #3d3549;
 }
 .foe .f-name { font-weight: 600; font-size: 14px; }
-.foe .f-count { font-weight: 700; color: var(--soul); font-size: 15px; }
+.foe .f-count { font-weight: 700; color: var(--soul); font-size: 15px; white-space: nowrap; }
 .foe .f-sub { grid-column: 2 / 4; font-size: 11px; color: var(--muted); }
+.foe .f-sub:empty { display: none; }
 .foe.done { opacity: 0.4; }
 .foe.done .f-count { color: var(--muted); }
 .foe canvas { display: block; }
 .foe.fresh .f-name::after {
   content: attr(data-badge);
-  margin-left: 6px;
-  padding: 0 5px;
+  display: block;             /* під назвою, окремим рядком */
+  width: fit-content;
+  margin-top: 2px;
+  padding: 0 3px;
   border-radius: 3px;
-  font-size: 10px;
+  font-size: 8px;
+  line-height: 13px;
+  white-space: nowrap;
   text-transform: uppercase;
   color: #1a1620;
   background: var(--soul);
