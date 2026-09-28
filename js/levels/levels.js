@@ -9,6 +9,7 @@ new LevelBuilder('cellar')
   .setMoney(150)
   .setMonsters(['archer', 'cannon', 'frost', 'spider', 'slime'])
   .addPath([[-1, 5], [6, 5], [6, 2], [13, 2], [13, 8], [20, 8]])
+  .setRocks([[0, 10, 3, 2], [17, 0, 3, 2]])
   .setTorches([[3, 4], [9, 1], [10, 3], [15, 7], [17, 9], [2, 6]])
   .build();
 

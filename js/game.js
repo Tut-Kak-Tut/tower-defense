@@ -17,6 +17,7 @@ const PATH_CELLS = (() => {
   }
   return cells;
 })();
+const ROCK_CELLS = new Set(ROCKS.map(([c, r]) => c + ',' + r));
 
 let game;
 
@@ -78,7 +79,8 @@ function towerAt(col, row) {
 }
 
 function canPlace(col, row) {
-  return inBounds(col, row) && !PATH_CELLS.has(col + ',' + row) && !towerAt(col, row);
+  const key = col + ',' + row;
+  return inBounds(col, row) && !PATH_CELLS.has(key) && !ROCK_CELLS.has(key) && !towerAt(col, row);
 }
 
 // Чи можна зараз поселити монстра цього типу (душі, ліміт підземелля, єдиний орк).
@@ -358,6 +360,9 @@ function buildMapLayer() {
     }
   }
 
+  // завали — нагромадження уламків скелі
+  for (const [c, r] of ROCKS) drawRubble(g, c, r);
+
   // вхід у підземелля — кована ґрата зліва
   const sy = PATH_POINTS[0][1] * CELL;
   g.fillStyle = '#0a080c';
@@ -370,6 +375,32 @@ function buildMapLayer() {
   g.fillRect(0, sy + CELL - 3, 12, 3);
 
   return layer;
+}
+
+// Завал на клітинці: тінь і кілька уламків-багатокутників; форма, розмір і відтінок — з hash, щоб не мерехтіло.
+function drawRubble(g, c, r) {
+  const x0 = c * CELL, y0 = r * CELL;
+  g.fillStyle = 'rgba(0,0,0,0.45)';
+  g.fillRect(x0 + 2, y0 + 2, CELL - 4, CELL - 4);
+  for (let k = 0; k < 5; k++) {
+    const cx = x0 + 8 + hash(c, r, 10 + k) * (CELL - 16);
+    const cy = y0 + 10 + hash(c, r, 20 + k) * (CELL - 18);
+    const rad = 6 + hash(c, r, 30 + k) * 7;
+    const rot = hash(c, r, 40 + k) * Math.PI;
+    const sides = 5 + Math.floor(hash(c, r, 50 + k) * 3);
+    g.fillStyle = `hsl(25, 6%, ${20 + hash(c, r, 60 + k) * 14}%)`;
+    g.beginPath();
+    for (let s = 0; s < sides; s++) {
+      const a = rot + s / sides * Math.PI * 2;
+      const rr = rad * (0.75 + hash(c * 7 + s, r, 70 + k) * 0.35);
+      const px = cx + Math.cos(a) * rr, py = cy + Math.sin(a) * rr;
+      if (s) g.lineTo(px, py); else g.moveTo(px, py);
+    }
+    g.closePath();
+    g.fill();
+    g.fillStyle = 'rgba(255,255,255,0.07)';   // відблиск згори
+    g.fillRect(cx - rad * 0.4, cy - rad * 0.6, rad * 0.8, 2);
+  }
 }
 
 let mapLayer = null;

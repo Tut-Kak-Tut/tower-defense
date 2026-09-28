@@ -60,3 +60,10 @@ test('помилки мапи', () => {
   bad(b => b.addPath(LEFT).setTorches([[8, 4]]), /факел 8,4 у коридорі/);
   bad(b => b.addPath(LEFT).setRocks([[0, 0]]).setTorches([[0, 0]]), /факел 0,0 на камені/);
 });
+
+test('ROCKS: каміння рівня в грі, без рівня — порожньо', () => {
+  assert.strictEqual(loadGame()('ROCKS').length, 0);
+  const rocks = loadGame({ search: '?level=cellar' })('ROCKS');
+  assert.ok(rocks.length > 0);
+  assert.deepEqual(rocks[0], [0, 10]);
+});

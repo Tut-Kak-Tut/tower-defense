@@ -54,6 +54,7 @@ const DIRS = [
 const LEVEL = LEVELS[new URLSearchParams(location.search).get('level')] || null;
 const PATH_POINTS = LEVEL ? LEVEL.paths[0].points : DEFAULT_PATH;
 const TORCHES = LEVEL ? LEVEL.torches : DEFAULT_TORCHES;
+const ROCKS = LEVEL ? LEVEL.rocks : [];   // завали: клітинки, де не можна селити монстрів
 
 const PATH_PX = PATH_POINTS.map(([c, r]) => cellCenter(c, r));
 // Пройдена відстань до кожної точки шляху — щоб поставити авантюриста на будь-яке місце (відкидання, поява).
