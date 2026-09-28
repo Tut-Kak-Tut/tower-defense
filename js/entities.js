@@ -65,6 +65,7 @@ const ROUTES = ROUTE_POINTS.map(points => {
   for (let i = 1; i < px.length; i++) len[i] = len[i - 1] + Math.hypot(px[i].x - px[i - 1].x, px[i].y - px[i - 1].y);
   return { px, len };
 });
+const routeLetter = i => String.fromCharCode(65 + i);   // мітка шляху на мапі й у панелі: A, B, C…
 
 class Enemy {
   // wave — номер набігу (сила — з setWave авантюриста), buff — множники набігу/групи (WaveBuilder)

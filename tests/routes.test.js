@@ -62,3 +62,8 @@ test('вантаж успадковує шлях', () => {
     assert.ok(b.y < e.y);
   }
 });
+
+test('routeLetter', () => {
+  const routeLetter = loadGame()('routeLetter');
+  assert.deepEqual([0, 1, 2].map(routeLetter), ['A', 'B', 'C']);
+});

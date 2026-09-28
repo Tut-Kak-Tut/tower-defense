@@ -18,12 +18,13 @@ function foeRow(type) {
   icon.appendChild(enemyIcon(type));
   row.appendChild(icon);
   row.insertAdjacentHTML('beforeend',
-    '<span class="f-name"></span><span class="f-count"></span><span class="f-sub"></span>');
+    '<span class="f-name"></span><span class="f-count"></span><span class="f-sub"></span><span class="f-route"></span>');
   return {
     row,
     name: row.querySelector('.f-name'),
     count: row.querySelector('.f-count'),
     sub: row.querySelector('.f-sub'),
+    route: row.querySelector('.f-route'),
   };
 }
 
@@ -286,9 +287,18 @@ function refreshRaid() {
     } else {
       $('raidTitle').textContent = game.waveActive ? L(`Набіг ${waveNo(index + 1)} триває`, `Набег ${waveNo(index + 1)} идёт`)
         : L(`Наступний набіг: ${waveNo(index + 1)}`, `Следующий набег: ${waveNo(index + 1)}`);
+      // якими шляхами йде кожен тип (лише коли шляхів кілька) — та сама черга, що й у startWave
+      const routes = {};
+      if (ROUTES.length > 1) {
+        for (const s of waveSpawns(index + 1, ROUTE_WEIGHTS)) (routes[s.type] ??= new Set()).add(s.route);
+      }
       for (const [type, count] of Object.entries(raidGroups(index))) {
         const r = foeRow(type);
         r.total = count;
+        if (routes[type]) {
+          r.route.textContent = [...routes[type]].sort().map(routeLetter).join('·');
+          r.route.title = L('Яким шляхом іде', 'Каким путём идёт');
+        }
         r.row.addEventListener('mouseenter', () => showFoeTip(type, index + 1, r.row));
         r.row.addEventListener('mouseleave', hideFoeTip);
         raidRows[type] = r;

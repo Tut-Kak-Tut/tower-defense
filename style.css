@@ -156,7 +156,9 @@ h3 {
 }
 .foe .f-name { font-weight: 600; font-size: 14px; }
 .foe .f-count { font-weight: 700; color: var(--soul); font-size: 15px; white-space: nowrap; }
-.foe .f-sub { grid-column: 2 / 4; font-size: 11px; color: var(--muted); }
+.foe .f-sub { grid-row: 2; grid-column: 2; font-size: 11px; color: var(--muted); }
+.foe .f-route { grid-row: 2; grid-column: 3; justify-self: end; font-size: 11px; font-weight: 700; color: var(--muted); letter-spacing: 1px; }
+.foe .f-route:empty { display: none; }
 .foe .f-sub:empty { display: none; }
 .foe.done { opacity: 0.4; }
 .foe.done .f-count { color: var(--muted); }

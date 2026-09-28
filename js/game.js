@@ -355,8 +355,37 @@ function buildMapLayer() {
   // завали — нагромадження уламків скелі
   for (const [c, r] of ROCKS) drawRubble(g, c, r);
 
-  // вхід у підземелля — кована ґрата зліва
-  const sy = ROUTE_POINTS[0][0][1] * CELL;
+  // входи в підземелля — кована ґрата на краю; спільний вхід кількох шляхів — одна ґрата з мітками всіх
+  const entries = new Map();   // 'c,r' → [точка входу, наступна точка, індекси шляхів]
+  ROUTE_POINTS.forEach((p, i) => {
+    const key = p[0].join(',');
+    if (!entries.has(key)) entries.set(key, [p[0], p[1], []]);
+    entries.get(key)[2].push(i);
+  });
+  for (const [[c, r], next, routes] of entries.values()) {
+    drawGate(g, c, r);
+    if (ROUTE_POINTS.length > 1) {
+      // мітка — на першій клітинці коридору за брамою
+      const lc = c + Math.sign(next[0] - c), lr = r + Math.sign(next[1] - r);
+      g.font = 'bold 15px Cinzel, Georgia, serif';
+      g.textAlign = 'center';
+      g.textBaseline = 'middle';
+      g.fillStyle = 'rgba(255, 210, 150, 0.55)';
+      g.fillText(routes.map(routeLetter).join('·'), lc * CELL + CELL / 2, lr * CELL + CELL / 2);
+    }
+  }
+
+  return layer;
+}
+
+// Кована ґрата входу. Намальована для лівого краю; для верхнього/нижнього — повернута всередину мапи.
+function drawGate(g, c, r) {
+  const left = c === -1, top = r === -1;
+  g.save();
+  if (left) g.translate(0, r * CELL + CELL / 2);
+  else g.translate(c * CELL + CELL / 2, top ? 0 : ROWS * CELL);
+  g.rotate(left ? 0 : top ? Math.PI / 2 : -Math.PI / 2);
+  const sy = -CELL / 2;
   g.fillStyle = '#0a080c';
   g.fillRect(0, sy + 2, 10, CELL - 4);
   g.fillStyle = '#5a5060';
@@ -365,8 +394,7 @@ function buildMapLayer() {
   g.fillRect(8, sy + 2, 2, CELL - 4);
   g.fillRect(0, sy, 12, 3);
   g.fillRect(0, sy + CELL - 3, 12, 3);
-
-  return layer;
+  g.restore();
 }
 
 // Завал на клітинці: тінь і кілька уламків-багатокутників; форма, розмір і відтінок — з hash, щоб не мерехтіло.
@@ -404,7 +432,8 @@ function drawMap() {
 
 // Серце Підземелля — на останній клітинці коридору, пульсує; спалахує червоним при ударі.
 function drawHeart() {
-  const [ec, er] = ROUTE_POINTS[0][ROUTE_POINTS[0].length - 1];
+  const heart = ROUTE_POINTS[0];
+  const [ec, er] = heart[heart.length - 1];   // спільне для всіх шляхів
   const x = (ec - 1) * CELL + CELL / 2, y = er * CELL + CELL / 2;
   const hurt = game.heartFlash / 0.5;
   const beat = 1.35 + 0.12 * Math.max(0, Math.sin(time * 4)) ** 3 + hurt * 0.2;
