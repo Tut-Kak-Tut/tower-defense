@@ -1,0 +1,8 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+Vulkan 1.4.341 - Forward Mobile - Using Device #0: NVIDIA - NVIDIA GeForce RTX 3050 Laptop GPU
+
+placed 13/13
+shot D:/MyProg/tower-defense/docs/reports/screens/fight40_0.png t=4.1 en=7 proj=0 fx=0 wave_active=true lives=99999
+shot D:/MyProg/tower-defense/docs/reports/screens/fight40_1.png t=9.0 en=11 proj=2 fx=0 wave_active=true lives=99999
+shot D:/MyProg/tower-defense/docs/reports/screens/fight40_2.png t=15.0 en=13 proj=0 fx=0 wave_active=true lives=99999
+FPS avg=18.5 min=1.0 maxEnemies=15 types=["normal", "banner", "knight", "tank", "hero", "priest"] over=

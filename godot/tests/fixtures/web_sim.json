@@ -1,0 +1,236 @@
+{
+ "seed": 12345,
+ "dt": 0.016666666666666666,
+ "money": 100000,
+ "upgrades": 3,
+ "start_money": 95570,
+ "placements": [
+  {
+   "type": "archer",
+   "col": 3,
+   "row": 3
+  },
+  {
+   "type": "cannon",
+   "col": 5,
+   "row": 3
+  },
+  {
+   "type": "frost",
+   "col": 3,
+   "row": 5
+  },
+  {
+   "type": "spider",
+   "col": 5,
+   "row": 6
+  },
+  {
+   "type": "eye",
+   "col": 6,
+   "row": 7
+  },
+  {
+   "type": "slime",
+   "col": 7,
+   "row": 5
+  },
+  {
+   "type": "vampire",
+   "col": 8,
+   "row": 6
+  },
+  {
+   "type": "plate",
+   "col": 10,
+   "row": 4
+  },
+  {
+   "type": "witch",
+   "col": 6,
+   "row": 5
+  },
+  {
+   "type": "grave",
+   "col": 12,
+   "row": 4
+  }
+ ],
+ "waves": [
+  {
+   "wave": 1,
+   "money": 95593,
+   "lives": 20,
+   "kills": 2,
+   "alive": 0
+  },
+  {
+   "wave": 2,
+   "money": 95629,
+   "lives": 20,
+   "kills": 6,
+   "alive": 0
+  },
+  {
+   "wave": 3,
+   "money": 95663,
+   "lives": 20,
+   "kills": 9,
+   "alive": 0
+  },
+  {
+   "wave": 4,
+   "money": 95715,
+   "lives": 20,
+   "kills": 15,
+   "alive": 0
+  },
+  {
+   "wave": 5,
+   "money": 95780,
+   "lives": 20,
+   "kills": 21,
+   "alive": 0
+  },
+  {
+   "wave": 6,
+   "money": 95875,
+   "lives": 20,
+   "kills": 30,
+   "alive": 0
+  },
+  {
+   "wave": 7,
+   "money": 95999,
+   "lives": 20,
+   "kills": 42,
+   "alive": 0
+  },
+  {
+   "wave": 8,
+   "money": 96135,
+   "lives": 20,
+   "kills": 58,
+   "alive": 0
+  },
+  {
+   "wave": 9,
+   "money": 96255,
+   "lives": 20,
+   "kills": 68,
+   "alive": 0
+  },
+  {
+   "wave": 10,
+   "money": 96489,
+   "lives": 20,
+   "kills": 82,
+   "alive": 0
+  },
+  {
+   "wave": 11,
+   "money": 96673,
+   "lives": 20,
+   "kills": 103,
+   "alive": 0
+  },
+  {
+   "wave": 12,
+   "money": 96887,
+   "lives": 20,
+   "kills": 132,
+   "alive": 0
+  },
+  {
+   "wave": 13,
+   "money": 97144,
+   "lives": 20,
+   "kills": 169,
+   "alive": 0
+  },
+  {
+   "wave": 14,
+   "money": 97439,
+   "lives": 20,
+   "kills": 208,
+   "alive": 0
+  },
+  {
+   "wave": 15,
+   "money": 97650,
+   "lives": 20,
+   "kills": 228,
+   "alive": 0
+  },
+  {
+   "wave": 16,
+   "money": 97987,
+   "lives": 20,
+   "kills": 270,
+   "alive": 0
+  },
+  {
+   "wave": 17,
+   "money": 98356,
+   "lives": 19,
+   "kills": 314,
+   "alive": 0
+  },
+  {
+   "wave": 18,
+   "money": 98725,
+   "lives": 19,
+   "kills": 358,
+   "alive": 0
+  },
+  {
+   "wave": 19,
+   "money": 99147,
+   "lives": 19,
+   "kills": 414,
+   "alive": 0
+  },
+  {
+   "wave": 20,
+   "money": 99361,
+   "lives": 13,
+   "kills": 437,
+   "alive": 0
+  },
+  {
+   "wave": 21,
+   "money": 99787,
+   "lives": 13,
+   "kills": 486,
+   "alive": 0
+  },
+  {
+   "wave": 22,
+   "money": 100259,
+   "lives": 11,
+   "kills": 542,
+   "alive": 0
+  },
+  {
+   "wave": 23,
+   "money": 100739,
+   "lives": 11,
+   "kills": 603,
+   "alive": 0
+  },
+  {
+   "wave": 24,
+   "money": 101253,
+   "lives": 8,
+   "kills": 660,
+   "alive": 0
+  },
+  {
+   "wave": 25,
+   "money": 101640,
+   "lives": 8,
+   "kills": 707,
+   "alive": 0
+  }
+ ]
+}

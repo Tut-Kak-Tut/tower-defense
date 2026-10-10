@@ -1,0 +1,76 @@
+{
+ "CELL": 40,
+ "COLS": 20,
+ "ROWS": 12,
+ "DEFAULT_PATH": [
+  [
+   -1,
+   2
+  ],
+  [
+   4,
+   2
+  ],
+  [
+   4,
+   8
+  ],
+  [
+   9,
+   8
+  ],
+  [
+   9,
+   3
+  ],
+  [
+   14,
+   3
+  ],
+  [
+   14,
+   9
+  ],
+  [
+   20,
+   9
+  ]
+ ],
+ "DEFAULT_TORCHES": [
+  [
+   2,
+   1
+  ],
+  [
+   5,
+   5
+  ],
+  [
+   7,
+   9
+  ],
+  [
+   11,
+   2
+  ],
+  [
+   15,
+   6
+  ],
+  [
+   17,
+   10
+  ]
+ ],
+ "START_MONEY": 150,
+ "START_LIVES": 20,
+ "WAVE_BONUS": 10,
+ "WAVE_BONUS_PER": 3,
+ "MAX_LEVEL": 10,
+ "SELL_REFUND": 0.6,
+ "MAX_TOWERS": 18,
+ "SHIELD_REGEN_DELAY": 2,
+ "FORMATION_GAP": 26,
+ "CAMPAIGN_WAVES": 100,
+ "REVEAL_TIME": 2
+}
